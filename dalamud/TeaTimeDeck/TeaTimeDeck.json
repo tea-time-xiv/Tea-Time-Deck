@@ -2,7 +2,7 @@
   "Name": "Tea Time Deck",
   "Author": "Tea Time",
   "Punchline": "Drive FFXIV from a Stream Deck.",
-  "Description": "Exposes a local API that a companion Elgato Stream Deck plugin talks to. Provides auto-populated browsers for every emote, mount, minion and gear set you own, plus live status readouts on deck keys.",
+  "Description": "Exposes a local API that a companion Elgato Stream Deck plugin talks to. Provides auto-populated browsers for every emote, mount and minion you own, plus live status readouts on deck keys.",
   "RepoUrl": "https://github.com/tea-time-xiv/Tea-Time-Deck",
   "Tags": [ "streamdeck", "elgato", "emote", "mount", "macro" ],
   "CategoryTags": [ "utility" ],

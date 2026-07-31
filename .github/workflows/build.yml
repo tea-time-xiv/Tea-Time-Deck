@@ -1,10 +1,13 @@
 name: Build Tea Time Deck
 
+# Pushes and PRs build and check. Releasing is a separate, deliberate act: push a
+# v* tag. That keeps a release from riding along on an ordinary commit to main.
 on:
   pull_request:
     branches: [ main ]
   push:
     branches: [ main ]
+    tags: [ 'v*' ]
 
 permissions:
   contents: write
@@ -25,17 +28,20 @@ jobs:
         $node = $csproj.SelectSingleNode("//PropertyGroup/Version")
         if (-not $node) { throw "No <Version> element in TeaTimeDeck.csproj" }
         $version = $node.InnerText.Trim()
-        Write-Host "Version: $version"
+        Write-Host "csproj version: $version"
         "VERSION=$version" >> $env:GITHUB_ENV
 
-    - name: Check if release tag exists
+    - name: Check tag matches csproj version
+      if: startsWith(github.ref, 'refs/tags/v')
       shell: pwsh
       run: |
-        git fetch --tags
-        $exists = git tag -l "v$env:VERSION"
-        $skip = if ($exists) { "true" } else { "false" }
-        Write-Host "Tag v$env:VERSION exists: $skip"
-        "SKIP_RELEASE=$skip" >> $env:GITHUB_ENV
+        # A tag that disagrees with the assembly would publish a pluginmaster entry
+        # pointing at a release asset built from a different version. Fail loudly.
+        $tagVersion = "${{ github.ref_name }}".TrimStart("v")
+        if ($tagVersion -ne $env:VERSION) {
+            throw "Tag ${{ github.ref_name }} does not match csproj <Version> $env:VERSION. Bump the csproj, or retag."
+        }
+        Write-Host "Tag and csproj agree on $env:VERSION."
 
     - name: Install .NET
       uses: actions/setup-dotnet@v5
@@ -88,19 +94,28 @@ jobs:
           TeaTimeDeck.zip
           xiv.teatime.deck.sdPlugin.zip
         if-no-files-found: error
-        retention-days: 1
+        retention-days: 7
 
     - name: Release
-      if: github.event_name == 'push' && env.SKIP_RELEASE == 'false'
+      if: startsWith(github.ref, 'refs/tags/v')
       uses: ncipollo/release-action@v1
       with:
         artifacts: "TeaTimeDeck.zip,xiv.teatime.deck.sdPlugin.zip"
-        tag: v${{ env.VERSION }}
-        name: Tea Time Deck v${{ env.VERSION }}
+        tag: ${{ github.ref_name }}
+        name: Tea Time Deck ${{ github.ref_name }}
+        generateReleaseNotes: true
+        makeLatest: true
         token: ${{ secrets.GITHUB_TOKEN }}
+        body: |
+          Two halves, both attached below. You need both.
+
+          | Asset | Where it goes |
+          | --- | --- |
+          | `TeaTimeDeck.zip` | The Dalamud plugin. Installed for you if you have the Tea Time repository added in `/xlsettings`; this asset is what that repository serves. |
+          | `xiv.teatime.deck.sdPlugin.zip` | The Stream Deck plugin. Unzip into `%AppData%\Elgato\StreamDeck\Plugins\` and restart the Stream Deck app. |
 
     - name: Update pluginmaster
-      if: github.event_name == 'push' && env.SKIP_RELEASE == 'false'
+      if: startsWith(github.ref, 'refs/tags/v')
       shell: pwsh
       env:
         PLUGINMASTER_TOKEN: ${{ secrets.PLUGINMASTER_TOKEN }}
@@ -113,7 +128,7 @@ jobs:
         # description edit lands in the repo without also editing this workflow.
         $manifest = Get-Content "dalamud/TeaTimeDeck/TeaTimeDeck.json" -Raw | ConvertFrom-Json
         $version = $env:VERSION
-        $downloadUrl = "https://github.com/tea-time-xiv/Tea-Time-Deck/releases/download/v$version/TeaTimeDeck.zip"
+        $downloadUrl = "https://github.com/tea-time-xiv/Tea-Time-Deck/releases/download/${{ github.ref_name }}/TeaTimeDeck.zip"
 
         $entry = [ordered]@{
             Author              = $manifest.Author
@@ -154,7 +169,7 @@ jobs:
         if (git diff --cached --quiet) {
             Write-Host "pluginmaster.json already up to date; nothing to push."
         } else {
-            git commit -m "Tea Time Deck v$version"
+            git commit -m "Tea Time Deck $version"
             git push -u origin master
         }
         Pop-Location
