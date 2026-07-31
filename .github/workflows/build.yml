@@ -79,12 +79,23 @@ jobs:
         npm run build
 
     - name: Package Stream Deck plugin
+      working-directory: streamdeck
       shell: pwsh
       run: |
-        # The pluginmaster only delivers the game half; the deck half rides along on the
-        # release so a user gets both from one page.
-        Compress-Archive -Path "streamdeck/xiv.teatime.deck.sdPlugin" `
-                         -DestinationPath "$env:GITHUB_WORKSPACE\xiv.teatime.deck.sdPlugin.zip"
+        # A .streamDeckPlugin is the double-clickable installer: the Stream Deck app
+        # installs and updates from it, so users never hand-copy a folder.
+        #
+        # --version stamps the csproj version into the manifest, keeping the two halves
+        # on one version number. It rewrites manifest.json in place, which is why the
+        # committed copy is already in the CLI's own formatting.
+        #
+        # --no-update-check pins validation to the installed CLI: a schema fetched
+        # mid-run could fail a build that has nothing wrong with it.
+        npx streamdeck pack xiv.teatime.deck.sdPlugin `
+            --version $env:VERSION `
+            --output $env:GITHUB_WORKSPACE `
+            --no-update-check `
+            --force
 
     - name: Store artifacts
       uses: actions/upload-artifact@v4
@@ -92,7 +103,7 @@ jobs:
         name: TeaTimeDeck
         path: |
           TeaTimeDeck.zip
-          xiv.teatime.deck.sdPlugin.zip
+          xiv.teatime.deck.streamDeckPlugin
         if-no-files-found: error
         retention-days: 7
 
@@ -100,7 +111,7 @@ jobs:
       if: startsWith(github.ref, 'refs/tags/v')
       uses: ncipollo/release-action@v1
       with:
-        artifacts: "TeaTimeDeck.zip,xiv.teatime.deck.sdPlugin.zip"
+        artifacts: "TeaTimeDeck.zip,xiv.teatime.deck.streamDeckPlugin"
         tag: ${{ github.ref_name }}
         name: Tea Time Deck ${{ github.ref_name }}
         generateReleaseNotes: true
@@ -109,10 +120,10 @@ jobs:
         body: |
           Two halves, both attached below. You need both.
 
-          | Asset | Where it goes |
+          | Asset | What to do with it |
           | --- | --- |
-          | `TeaTimeDeck.zip` | The Dalamud plugin. Installed for you if you have the Tea Time repository added in `/xlsettings`; this asset is what that repository serves. |
-          | `xiv.teatime.deck.sdPlugin.zip` | The Stream Deck plugin. Unzip into `%AppData%\Elgato\StreamDeck\Plugins\` and restart the Stream Deck app. |
+          | `xiv.teatime.deck.streamDeckPlugin` | The Stream Deck plugin. Double-click it — the Stream Deck app installs or updates it for you. |
+          | `TeaTimeDeck.zip` | The Dalamud plugin. You do not need to touch this: add the Tea Time repository in `/xlsettings` and install from `/xlplugins`. It is attached because that repository serves this file. |
 
     - name: Update pluginmaster
       if: startsWith(github.ref, 'refs/tags/v')

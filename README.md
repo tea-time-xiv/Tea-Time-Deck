@@ -88,6 +88,28 @@ that fire actions, no conditional rotations, no chat-command injection. Actions
 are executed by writing a scratch hotbar slot and triggering it, the same
 mechanism the game itself uses for a keyboard press.
 
+## Installing
+
+Two halves, installed separately once. Both come from the
+[latest release](https://github.com/tea-time-xiv/Tea-Time-Deck/releases).
+
+**Game half.** In FFXIV, `/xlsettings` → Experimental → add this to the custom
+plugin repositories list:
+
+```
+https://raw.githubusercontent.com/tea-time-xiv/pluginmaster/master/pluginmaster.json
+```
+
+Then `/xlplugins` → search **Tea Time Deck** → Install. Updates arrive through
+Dalamud from then on.
+
+**Deck half.** Download `xiv.teatime.deck.streamDeckPlugin` and double-click it.
+The Stream Deck app installs it, and later releases update over the top.
+
+Nothing to configure after that: there is no key to pair, and the Stream Deck
+plugin finds the port by reading the game plugin's own config file. Drag a key
+on and it works.
+
 ## Building
 
 See [BUILDING.md](BUILDING.md) for the game half and
@@ -103,9 +125,9 @@ cd streamdeck; npm install; npm run build; cd ..
 .\tools\Install-StreamDeckPlugin.ps1 -Restart
 ```
 
-Nothing to configure after that: there is no key to pair, and the Stream Deck
-plugin finds the port by reading this plugin's own config file. Drag a key on
-and it works.
+That junctions the plugin folder into the Stream Deck app rather than packing
+it, so a rebuild needs no reinstall. `npm run package` in `streamdeck/` builds
+the `.streamDeckPlugin` installer instead.
 
 ## Status
 

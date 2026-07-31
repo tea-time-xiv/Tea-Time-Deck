@@ -218,8 +218,9 @@ function Save-Icon {
 $PluginRoot = (Resolve-Path $PluginRoot).Path
 Write-Host "writing icons under $PluginRoot" -ForegroundColor Cyan
 
-# Marketplace icon has no @2x variant.
+# Marketplace icon. `streamdeck pack` warns unless the @2x variant is there too.
 Save-Icon -Path (Join-Path $PluginRoot 'imgs\plugin\marketplace.png') -Size 288
+Save-Icon -Path (Join-Path $PluginRoot 'imgs\plugin\marketplace@2x.png') -Size 576
 
 Save-Icon -Path (Join-Path $PluginRoot 'imgs\plugin\category-icon.png') -Size 28 -Transparent
 Save-Icon -Path (Join-Path $PluginRoot 'imgs\plugin\category-icon@2x.png') -Size 56 -Transparent

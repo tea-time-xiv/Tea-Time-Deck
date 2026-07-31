@@ -13,7 +13,22 @@ npm run build      # or: npm run watch
 
 Output lands in `xiv.teatime.deck.sdPlugin/bin/plugin.js`.
 
+## Install a release
+
+Grab `xiv.teatime.deck.streamDeckPlugin` from the
+[latest release](https://github.com/tea-time-xiv/Tea-Time-Deck/releases) and
+double-click it. The Stream Deck app installs it, and updates over it when a
+later one is opened. Nothing to unzip or copy.
+
+To build that file yourself:
+
+```powershell
+npm run package        # writes ../dist/xiv.teatime.deck.streamDeckPlugin
+```
+
 ## Install for development
+
+Packing on every change would be slow, so development uses a junction instead:
 
 ```powershell
 ..\tools\Install-StreamDeckPlugin.ps1 -Restart

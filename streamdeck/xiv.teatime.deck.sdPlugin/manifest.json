@@ -30,7 +30,9 @@
       "Icon": "imgs/actions/entry/icon",
       "Tooltip": "Perform an emote or summon a mount.",
       "PropertyInspectorPath": "ui/entry.html",
-      "Controllers": ["Keypad"],
+      "Controllers": [
+        "Keypad"
+      ],
       "States": [
         {
           "Image": "imgs/actions/entry/key",
@@ -43,7 +45,9 @@
       "Name": "Browser Slot",
       "Icon": "imgs/actions/slot/icon",
       "Tooltip": "One cell of the browser. Place several; however many are visible is the page size.",
-      "Controllers": ["Keypad"],
+      "Controllers": [
+        "Keypad"
+      ],
       "UserTitleEnabled": false,
       "States": [
         {
@@ -57,7 +61,9 @@
       "Name": "Browser: Previous Page",
       "Icon": "imgs/actions/prev/icon",
       "Tooltip": "Page the browser slots backwards.",
-      "Controllers": ["Keypad"],
+      "Controllers": [
+        "Keypad"
+      ],
       "UserTitleEnabled": false,
       "States": [
         {
@@ -71,7 +77,9 @@
       "Name": "Browser: Next Page",
       "Icon": "imgs/actions/next/icon",
       "Tooltip": "Page the browser slots forwards.",
-      "Controllers": ["Keypad"],
+      "Controllers": [
+        "Keypad"
+      ],
       "UserTitleEnabled": false,
       "States": [
         {
@@ -85,7 +93,9 @@
       "Name": "Browser: Switch Type",
       "Icon": "imgs/actions/kind/icon",
       "Tooltip": "Cycle the browser between emotes, mounts and anything else available.",
-      "Controllers": ["Keypad"],
+      "Controllers": [
+        "Keypad"
+      ],
       "UserTitleEnabled": false,
       "States": [
         {
@@ -100,40 +110,64 @@
       "Icon": "imgs/actions/vitals/icon",
       "Tooltip": "HP, MP, GP or CP. Read-only.",
       "PropertyInspectorPath": "ui/vitals.html",
-      "Controllers": ["Keypad"],
+      "Controllers": [
+        "Keypad"
+      ],
       "UserTitleEnabled": false,
       "DisableAutomaticStates": true,
-      "States": [{ "Image": "imgs/actions/vitals/key" }]
+      "States": [
+        {
+          "Image": "imgs/actions/vitals/key"
+        }
+      ]
     },
     {
       "UUID": "xiv.teatime.deck.status.job",
       "Name": "Status: Job",
       "Icon": "imgs/actions/job/icon",
       "Tooltip": "Current job and level. Read-only.",
-      "Controllers": ["Keypad"],
+      "Controllers": [
+        "Keypad"
+      ],
       "UserTitleEnabled": false,
       "DisableAutomaticStates": true,
-      "States": [{ "Image": "imgs/actions/job/key" }]
+      "States": [
+        {
+          "Image": "imgs/actions/job/key"
+        }
+      ]
     },
     {
       "UUID": "xiv.teatime.deck.status.duty",
       "Name": "Status: Duty",
       "Icon": "imgs/actions/duty/icon",
       "Tooltip": "Duty Finder queue state. Read-only.",
-      "Controllers": ["Keypad"],
+      "Controllers": [
+        "Keypad"
+      ],
       "UserTitleEnabled": false,
       "DisableAutomaticStates": true,
-      "States": [{ "Image": "imgs/actions/duty/key" }]
+      "States": [
+        {
+          "Image": "imgs/actions/duty/key"
+        }
+      ]
     },
     {
       "UUID": "xiv.teatime.deck.status.retainers",
       "Name": "Status: Ventures",
       "Icon": "imgs/actions/venture/icon",
       "Tooltip": "Retainer venture timers. Read-only.",
-      "Controllers": ["Keypad"],
+      "Controllers": [
+        "Keypad"
+      ],
       "UserTitleEnabled": false,
       "DisableAutomaticStates": true,
-      "States": [{ "Image": "imgs/actions/venture/key" }]
+      "States": [
+        {
+          "Image": "imgs/actions/venture/key"
+        }
+      ]
     },
     {
       "UUID": "xiv.teatime.deck.status.cooldown",
@@ -141,10 +175,16 @@
       "Icon": "imgs/actions/recast/icon",
       "Tooltip": "Recast timer for Sprint, Teleport or Return. Read-only.",
       "PropertyInspectorPath": "ui/cooldown.html",
-      "Controllers": ["Keypad"],
+      "Controllers": [
+        "Keypad"
+      ],
       "UserTitleEnabled": false,
       "DisableAutomaticStates": true,
-      "States": [{ "Image": "imgs/actions/recast/key" }]
+      "States": [
+        {
+          "Image": "imgs/actions/recast/key"
+        }
+      ]
     }
   ]
 }
