@@ -1,0 +1,20 @@
+<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+
+  <PropertyGroup>
+    <Version>0.1.0.0</Version>
+    <Authors>Tea Time</Authors>
+    <Description>Stream Deck bridge for FFXIV, with auto-populated browsers for emotes, mounts and more.</Description>
+    <PackageProjectUrl>https://github.com/tea-time-xiv/Tea-Time-Deck</PackageProjectUrl>
+    <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
+    <Copyright>Copyright (C) 2026 Tea Time</Copyright>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- Executing a hotbar slot means handing FFXIVClientStructs a raw pointer. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+</Project>

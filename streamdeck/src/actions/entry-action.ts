@@ -1,0 +1,113 @@
+import streamDeck, {
+	action,
+	SingletonAction,
+	type DidReceiveSettingsEvent,
+	type KeyDownEvent,
+	type PropertyInspectorDidAppearEvent,
+	type SendToPluginEvent,
+	type WillAppearEvent,
+} from "@elgato/streamdeck";
+// The SDK uses these types in its own public signatures but re-exports them from here.
+import type { JsonValue } from "@elgato/utils";
+
+import { xiv } from "../xiv-client.js";
+
+/** What the property inspector stores against a key. */
+export type EntrySettings = {
+	kind?: string;
+	id?: number;
+	name?: string;
+	iconId?: number;
+};
+
+/** Messages the property inspector sends us. */
+type UiMessage = { event: "getKinds" } | { event: "getEntries"; kind: string };
+
+@action({ UUID: "xiv.teatime.deck.entry" })
+export class EntryAction extends SingletonAction<EntrySettings> {
+	override onWillAppear(ev: WillAppearEvent<EntrySettings>): Promise<void> | void {
+		return this.#render(ev.action, ev.payload.settings);
+	}
+
+	/** Fires when the inspector saves a different entry; repaint to match. */
+	override onDidReceiveSettings(ev: DidReceiveSettingsEvent<EntrySettings>): Promise<void> | void {
+		return this.#render(ev.action, ev.payload.settings);
+	}
+
+	override async onKeyDown(ev: KeyDownEvent<EntrySettings>): Promise<void> {
+		const { kind, id } = ev.payload.settings;
+
+		if (kind === undefined || id === undefined) {
+			streamDeck.logger.info("Key pressed before an entry was chosen.");
+			await ev.action.showAlert();
+			return;
+		}
+
+		try {
+			await xiv.execute(kind, id);
+			await ev.action.showOk();
+		} catch (error) {
+			// Refusals are routine -- game closed, already mounted, wrong zone.
+			streamDeck.logger.info(`Could not execute ${kind} ${id}: ${asMessage(error)}`);
+			await ev.action.showAlert();
+		}
+	}
+
+	override onPropertyInspectorDidAppear(ev: PropertyInspectorDidAppearEvent<EntrySettings>): Promise<void> | void {
+		// The inspector cannot ask until it has registered, so push the list list at it.
+		return this.#sendKinds();
+	}
+
+	override async onSendToPlugin(ev: SendToPluginEvent<JsonValue, EntrySettings>): Promise<void> {
+		const message = ev.payload as UiMessage;
+
+		if (message?.event === "getKinds") {
+			await this.#sendKinds();
+			return;
+		}
+
+		if (message?.event === "getEntries") {
+			await this.#sendEntries(message.kind);
+		}
+	}
+
+	async #sendKinds(): Promise<void> {
+		try {
+			const kinds = await xiv.getKinds();
+			await streamDeck.ui.sendToPropertyInspector({ event: "kinds", kinds });
+		} catch (error) {
+			await streamDeck.ui.sendToPropertyInspector({ event: "error", message: asMessage(error) });
+		}
+	}
+
+	async #sendEntries(kind: string): Promise<void> {
+		try {
+			const entries = await xiv.getEntries(kind);
+			await streamDeck.ui.sendToPropertyInspector({ event: "entries", kind, entries });
+		} catch (error) {
+			await streamDeck.ui.sendToPropertyInspector({ event: "error", message: asMessage(error) });
+		}
+	}
+
+	async #render(target: WillAppearEvent<EntrySettings>["action"], settings: EntrySettings): Promise<void> {
+		await target.setTitle(settings.name ?? "Set\nentry");
+
+		if (settings.iconId === undefined) {
+			// No argument resets the key to the image declared in the manifest.
+			await target.setImage();
+			return;
+		}
+
+		try {
+			await target.setImage(await xiv.getIcon(settings.iconId));
+		} catch (error) {
+			// Keep the default artwork and the title; the key still works.
+			streamDeck.logger.debug(`No icon for ${settings.iconId}: ${asMessage(error)}`);
+			await target.setImage();
+		}
+	}
+}
+
+function asMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}

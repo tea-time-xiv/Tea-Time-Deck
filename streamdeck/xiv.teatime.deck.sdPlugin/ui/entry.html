@@ -1,0 +1,336 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<title>TeaTimeDeck</title>
+		<style>
+			/*
+			 * Hand-rolled rather than pulling in sdpi-components, which loads from a CDN.
+			 * The inspector must work with no internet and with the game the only server.
+			 */
+			body {
+				background: #2d2d2d;
+				color: #d8d8d8;
+				font: 9pt "Segoe UI", sans-serif;
+				margin: 0;
+				padding: 12px;
+			}
+
+			.row {
+				align-items: center;
+				display: flex;
+				gap: 8px;
+				margin-bottom: 8px;
+			}
+
+			label {
+				color: #969696;
+				flex: 0 0 84px;
+				text-align: right;
+			}
+
+			input,
+			select {
+				background: #3d3d3d;
+				border: 1px solid #4d4d4d;
+				border-radius: 3px;
+				color: #d8d8d8;
+				flex: 1 1 auto;
+				min-width: 0;
+				padding: 4px 6px;
+			}
+
+			input:focus,
+			select:focus {
+				border-color: #7a7a7a;
+				outline: none;
+			}
+
+			hr {
+				border: 0;
+				border-top: 1px solid #3d3d3d;
+				margin: 12px 0;
+			}
+
+			.status {
+				margin-left: 92px;
+				min-height: 14px;
+			}
+
+			.status.error {
+				color: #e46b6b;
+			}
+
+			.status.ok {
+				color: #6bbf6b;
+			}
+
+			.hint {
+				color: #808080;
+				margin-left: 92px;
+			}
+
+			#connectionStatus {
+				margin-bottom: 8px;
+			}
+
+			summary {
+				color: #969696;
+				cursor: pointer;
+				margin-bottom: 8px;
+			}
+		</style>
+	</head>
+
+	<body>
+		<div class="row">
+			<label for="kind">Type</label>
+			<select id="kind"></select>
+		</div>
+
+		<div class="row">
+			<label for="entry">Entry</label>
+			<select id="entry"></select>
+		</div>
+
+		<div class="status" id="status"></div>
+
+		<hr />
+
+		<div class="hint" id="connectionStatus"></div>
+
+		<details id="advanced">
+			<summary>Connection</summary>
+
+			<div class="row">
+				<label for="port">Port</label>
+				<input id="port" type="number" min="1024" max="65535" />
+			</div>
+
+			<div class="hint">
+				The port comes from the game's own settings. Fill this in only if that
+				failed; clear it to go back to finding it.
+			</div>
+		</details>
+
+		<script>
+			let websocket;
+			let uuid;
+			let actionId;
+			let settings = {};
+			let globalSettings = {};
+			// Kept so the change handler can pull the icon id off the chosen entry.
+			let currentEntries = [];
+
+			const kindSelect = document.getElementById("kind");
+			const entrySelect = document.getElementById("entry");
+			const statusEl = document.getElementById("status");
+			const portInput = document.getElementById("port");
+			const connectionStatusEl = document.getElementById("connectionStatus");
+
+			function setStatus(text, kind) {
+				statusEl.textContent = text;
+				statusEl.className = "status" + (kind ? " " + kind : "");
+			}
+
+			function send(message) {
+				if (websocket && websocket.readyState === 1) {
+					websocket.send(JSON.stringify(message));
+				}
+			}
+
+			function saveSettings() {
+				send({ event: "setSettings", context: uuid, payload: settings });
+			}
+
+			function saveGlobalSettings() {
+				send({ event: "setGlobalSettings", context: uuid, payload: globalSettings });
+			}
+
+			function sendToPlugin(payload) {
+				send({ event: "sendToPlugin", action: actionId, context: uuid, payload: payload });
+			}
+
+			// Entry point the Stream Deck app calls once the inspector is loaded.
+			function connectElgatoStreamDeckSocket(port, inUUID, registerEvent, info, actionInfo) {
+				uuid = inUUID;
+
+				const parsed = JSON.parse(actionInfo);
+				actionId = parsed.action;
+				settings = parsed.payload.settings || {};
+
+				websocket = new WebSocket("ws://127.0.0.1:" + port);
+
+				websocket.onopen = function () {
+					send({ event: registerEvent, uuid: uuid });
+					send({ event: "getGlobalSettings", context: uuid });
+					setStatus("connecting to FFXIV…");
+					sendToPlugin({ event: "getKinds" });
+				};
+
+				websocket.onmessage = function (message) {
+					const data = JSON.parse(message.data);
+
+					if (data.event === "didReceiveGlobalSettings") {
+						globalSettings = data.payload.settings || {};
+						// Left blank unless overridden, so the field shows what is in use
+						// without pinning it.
+						portInput.value = globalSettings.port || "";
+						portInput.placeholder = globalSettings.activePort || 37985;
+						renderConnectionStatus();
+						return;
+					}
+
+					if (data.event === "didReceiveSettings") {
+						settings = data.payload.settings || {};
+						return;
+					}
+
+					if (data.event === "sendToPropertyInspector") {
+						handlePluginMessage(data.payload);
+					}
+				};
+			}
+
+			function handlePluginMessage(payload) {
+				if (!payload) {
+					return;
+				}
+
+				if (payload.event === "error") {
+					setStatus(payload.message, "error");
+					return;
+				}
+
+				if (payload.event === "kinds") {
+					fillKinds(payload.kinds);
+					return;
+				}
+
+				if (payload.event === "entries") {
+					fillEntries(payload.entries);
+				}
+			}
+
+			// The plugin reports where the port came from; the inspector only shows it.
+			function renderConnectionStatus() {
+				const source = globalSettings.portSource;
+				const port = globalSettings.activePort || 37985;
+
+				if (source === "manual") {
+					connectionStatusEl.textContent = "Port " + port + ", as typed in below.";
+					connectionStatusEl.title = "";
+					return;
+				}
+
+				if (source === "auto") {
+					connectionStatusEl.textContent = "Port " + port + ", from the game's settings.";
+					connectionStatusEl.title = globalSettings.portPath || "";
+					return;
+				}
+
+				// No config file found. The default is still worth trying, so this is a
+				// note rather than an error.
+				connectionStatusEl.textContent = "Port " + port + " (default). Is TeaTimeDeck installed in FFXIV?";
+				connectionStatusEl.title = "";
+			}
+
+			function fillKinds(kinds) {
+				setStatus("");
+				kindSelect.innerHTML = "";
+
+				kinds.forEach(function (kind) {
+					const option = document.createElement("option");
+					option.value = kind.kind;
+					option.textContent = kind.displayName;
+					kindSelect.appendChild(option);
+				});
+
+				// Default to whatever this key already had, else the first type offered.
+				if (settings.kind && kinds.some((k) => k.kind === settings.kind)) {
+					kindSelect.value = settings.kind;
+				} else if (kinds.length > 0) {
+					settings.kind = kinds[0].kind;
+				}
+
+				requestEntries();
+			}
+
+			function fillEntries(entries) {
+				currentEntries = entries;
+				entrySelect.innerHTML = "";
+
+				if (entries.length === 0) {
+					setStatus("nothing of this type is unlocked", "error");
+					return;
+				}
+
+				setStatus(entries.length + " available", "ok");
+
+				entries.forEach(function (entry) {
+					const option = document.createElement("option");
+					option.value = String(entry.id);
+					option.textContent = entry.category ? entry.name + "  —  " + entry.category : entry.name;
+					entrySelect.appendChild(option);
+				});
+
+				const stillPresent = entries.some((e) => e.id === settings.id);
+				if (settings.id !== undefined && stillPresent) {
+					entrySelect.value = String(settings.id);
+				} else {
+					// The saved entry is gone, or this key is new: adopt the first one.
+					selectEntry(entries[0]);
+				}
+			}
+
+			function selectEntry(entry) {
+				settings.id = entry.id;
+				settings.name = entry.name;
+				settings.iconId = entry.iconId;
+				saveSettings();
+			}
+
+			function requestEntries() {
+				entrySelect.innerHTML = "";
+				setStatus("loading…");
+				sendToPlugin({ event: "getEntries", kind: settings.kind });
+			}
+
+			kindSelect.addEventListener("change", function () {
+				settings.kind = kindSelect.value;
+				// The old entry belongs to the old type; do not carry it across.
+				delete settings.id;
+				delete settings.name;
+				delete settings.iconId;
+				saveSettings();
+				requestEntries();
+			});
+
+			entrySelect.addEventListener("change", function () {
+				const chosen = currentEntries.find((e) => String(e.id) === entrySelect.value);
+				if (chosen) {
+					selectEntry(chosen);
+				}
+			});
+
+			portInput.addEventListener("change", function () {
+				const value = portInput.value.trim();
+
+				// Cleared means "go back to whatever the game says".
+				if (value === "") {
+					delete globalSettings.port;
+				} else {
+					globalSettings.port = Number(value);
+				}
+
+				saveGlobalSettings();
+
+				// The client reconnects on the new port; give it a moment, then refill.
+				setStatus("reconnecting…");
+				setTimeout(function () {
+					sendToPlugin({ event: "getKinds" });
+				}, 1200);
+			});
+		</script>
+	</body>
+</html>

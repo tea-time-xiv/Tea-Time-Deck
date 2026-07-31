@@ -1,0 +1,150 @@
+{
+  "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+  "UUID": "xiv.teatime.deck",
+  "Name": "Tea Time Deck",
+  "Version": "0.1.0.0",
+  "Author": "Tea Time",
+  "Description": "Perform emotes and summon mounts in Final Fantasy XIV. Lists are populated from what your character has actually unlocked.",
+  "Category": "Tea Time Deck",
+  "CategoryIcon": "imgs/plugin/category-icon",
+  "Icon": "imgs/plugin/marketplace",
+  "CodePath": "bin/plugin.js",
+  "SDKVersion": 2,
+  "Software": {
+    "MinimumVersion": "6.5"
+  },
+  "OS": [
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    }
+  ],
+  "Nodejs": {
+    "Version": "20",
+    "Debug": "enabled"
+  },
+  "Actions": [
+    {
+      "UUID": "xiv.teatime.deck.entry",
+      "Name": "Emote / Mount",
+      "Icon": "imgs/actions/entry/icon",
+      "Tooltip": "Perform an emote or summon a mount.",
+      "PropertyInspectorPath": "ui/entry.html",
+      "Controllers": ["Keypad"],
+      "States": [
+        {
+          "Image": "imgs/actions/entry/key",
+          "TitleAlignment": "bottom"
+        }
+      ]
+    },
+    {
+      "UUID": "xiv.teatime.deck.browser.slot",
+      "Name": "Browser Slot",
+      "Icon": "imgs/actions/slot/icon",
+      "Tooltip": "One cell of the browser. Place several; however many are visible is the page size.",
+      "Controllers": ["Keypad"],
+      "UserTitleEnabled": false,
+      "States": [
+        {
+          "Image": "imgs/actions/slot/key",
+          "TitleAlignment": "bottom"
+        }
+      ]
+    },
+    {
+      "UUID": "xiv.teatime.deck.browser.prev",
+      "Name": "Browser: Previous Page",
+      "Icon": "imgs/actions/prev/icon",
+      "Tooltip": "Page the browser slots backwards.",
+      "Controllers": ["Keypad"],
+      "UserTitleEnabled": false,
+      "States": [
+        {
+          "Image": "imgs/actions/prev/key",
+          "TitleAlignment": "bottom"
+        }
+      ]
+    },
+    {
+      "UUID": "xiv.teatime.deck.browser.next",
+      "Name": "Browser: Next Page",
+      "Icon": "imgs/actions/next/icon",
+      "Tooltip": "Page the browser slots forwards.",
+      "Controllers": ["Keypad"],
+      "UserTitleEnabled": false,
+      "States": [
+        {
+          "Image": "imgs/actions/next/key",
+          "TitleAlignment": "bottom"
+        }
+      ]
+    },
+    {
+      "UUID": "xiv.teatime.deck.browser.kind",
+      "Name": "Browser: Switch Type",
+      "Icon": "imgs/actions/kind/icon",
+      "Tooltip": "Cycle the browser between emotes, mounts and anything else available.",
+      "Controllers": ["Keypad"],
+      "UserTitleEnabled": false,
+      "States": [
+        {
+          "Image": "imgs/actions/kind/key",
+          "TitleAlignment": "bottom"
+        }
+      ]
+    },
+    {
+      "UUID": "xiv.teatime.deck.status.vitals",
+      "Name": "Status: Vitals",
+      "Icon": "imgs/actions/vitals/icon",
+      "Tooltip": "HP, MP, GP or CP. Read-only.",
+      "PropertyInspectorPath": "ui/vitals.html",
+      "Controllers": ["Keypad"],
+      "UserTitleEnabled": false,
+      "DisableAutomaticStates": true,
+      "States": [{ "Image": "imgs/actions/vitals/key" }]
+    },
+    {
+      "UUID": "xiv.teatime.deck.status.job",
+      "Name": "Status: Job",
+      "Icon": "imgs/actions/job/icon",
+      "Tooltip": "Current job and level. Read-only.",
+      "Controllers": ["Keypad"],
+      "UserTitleEnabled": false,
+      "DisableAutomaticStates": true,
+      "States": [{ "Image": "imgs/actions/job/key" }]
+    },
+    {
+      "UUID": "xiv.teatime.deck.status.duty",
+      "Name": "Status: Duty",
+      "Icon": "imgs/actions/duty/icon",
+      "Tooltip": "Duty Finder queue state. Read-only.",
+      "Controllers": ["Keypad"],
+      "UserTitleEnabled": false,
+      "DisableAutomaticStates": true,
+      "States": [{ "Image": "imgs/actions/duty/key" }]
+    },
+    {
+      "UUID": "xiv.teatime.deck.status.retainers",
+      "Name": "Status: Ventures",
+      "Icon": "imgs/actions/venture/icon",
+      "Tooltip": "Retainer venture timers. Read-only.",
+      "Controllers": ["Keypad"],
+      "UserTitleEnabled": false,
+      "DisableAutomaticStates": true,
+      "States": [{ "Image": "imgs/actions/venture/key" }]
+    },
+    {
+      "UUID": "xiv.teatime.deck.status.cooldown",
+      "Name": "Status: Recast",
+      "Icon": "imgs/actions/recast/icon",
+      "Tooltip": "Recast timer for Sprint, Teleport or Return. Read-only.",
+      "PropertyInspectorPath": "ui/cooldown.html",
+      "Controllers": ["Keypad"],
+      "UserTitleEnabled": false,
+      "DisableAutomaticStates": true,
+      "States": [{ "Image": "imgs/actions/recast/key" }]
+    }
+  ]
+}
