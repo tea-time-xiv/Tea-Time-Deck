@@ -1,0 +1,160 @@
+name: Build Tea Time Deck
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+
+  build:
+    runs-on: windows-2022
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+
+    - name: Read version from csproj
+      shell: pwsh
+      run: |
+        $csproj = [xml](Get-Content "dalamud/TeaTimeDeck/TeaTimeDeck.csproj")
+        $node = $csproj.SelectSingleNode("//PropertyGroup/Version")
+        if (-not $node) { throw "No <Version> element in TeaTimeDeck.csproj" }
+        $version = $node.InnerText.Trim()
+        Write-Host "Version: $version"
+        "VERSION=$version" >> $env:GITHUB_ENV
+
+    - name: Check if release tag exists
+      shell: pwsh
+      run: |
+        git fetch --tags
+        $exists = git tag -l "v$env:VERSION"
+        $skip = if ($exists) { "true" } else { "false" }
+        Write-Host "Tag v$env:VERSION exists: $skip"
+        "SKIP_RELEASE=$skip" >> $env:GITHUB_ENV
+
+    - name: Install .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Download Dalamud
+      shell: pwsh
+      run: |
+        Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/stg/latest.zip -OutFile dalamud-dev.zip
+        Expand-Archive -Force dalamud-dev.zip "$env:AppData\XIVLauncher\addon\Hooks\dev"
+
+    - name: Build Dalamud plugin
+      run: dotnet build dalamud/TeaTimeDeck.slnx --configuration Release
+
+    - name: Collect Dalamud plugin zip
+      shell: pwsh
+      run: |
+        # Dalamud.NET.Sdk already packages the plugin in the layout Dalamud expects
+        # (dll + manifest + deps). Repacking it by hand would only risk getting it wrong.
+        Copy-Item "dalamud/TeaTimeDeck/bin/Release/TeaTimeDeck/latest.zip" `
+                  "$env:GITHUB_WORKSPACE\TeaTimeDeck.zip"
+
+    - name: Install Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: npm
+        cache-dependency-path: streamdeck/package-lock.json
+
+    - name: Build Stream Deck plugin
+      working-directory: streamdeck
+      run: |
+        npm ci
+        npm run build
+
+    - name: Package Stream Deck plugin
+      shell: pwsh
+      run: |
+        # The pluginmaster only delivers the game half; the deck half rides along on the
+        # release so a user gets both from one page.
+        Compress-Archive -Path "streamdeck/xiv.teatime.deck.sdPlugin" `
+                         -DestinationPath "$env:GITHUB_WORKSPACE\xiv.teatime.deck.sdPlugin.zip"
+
+    - name: Store artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: TeaTimeDeck
+        path: |
+          TeaTimeDeck.zip
+          xiv.teatime.deck.sdPlugin.zip
+        if-no-files-found: error
+        retention-days: 1
+
+    - name: Release
+      if: github.event_name == 'push' && env.SKIP_RELEASE == 'false'
+      uses: ncipollo/release-action@v1
+      with:
+        artifacts: "TeaTimeDeck.zip,xiv.teatime.deck.sdPlugin.zip"
+        tag: v${{ env.VERSION }}
+        name: Tea Time Deck v${{ env.VERSION }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Update pluginmaster
+      if: github.event_name == 'push' && env.SKIP_RELEASE == 'false'
+      shell: pwsh
+      env:
+        PLUGINMASTER_TOKEN: ${{ secrets.PLUGINMASTER_TOKEN }}
+      run: |
+        $ErrorActionPreference = "Stop"
+
+        git clone https://x-access-token:$env:PLUGINMASTER_TOKEN@github.com/tea-time-xiv/pluginmaster.git pluginmaster-repo
+
+        # The plugin manifest is the single source of truth for the listing text, so a
+        # description edit lands in the repo without also editing this workflow.
+        $manifest = Get-Content "dalamud/TeaTimeDeck/TeaTimeDeck.json" -Raw | ConvertFrom-Json
+        $version = $env:VERSION
+        $downloadUrl = "https://github.com/tea-time-xiv/Tea-Time-Deck/releases/download/v$version/TeaTimeDeck.zip"
+
+        $entry = [ordered]@{
+            Author              = $manifest.Author
+            Name                = $manifest.Name
+            Punchline           = $manifest.Punchline
+            Description         = $manifest.Description
+            Changelog           = "- $version"
+            IsHide              = $false
+            InternalName        = "TeaTimeDeck"
+            AssemblyVersion     = $version
+            IsTestingExclusive  = $false
+            ApplicableVersion   = "any"
+            DalamudApiLevel     = 15
+            DownloadCount       = 0
+            LastUpdate          = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+            DownloadLinkInstall = $downloadUrl
+            DownloadLinkUpdate  = $downloadUrl
+            RepoUrl             = $manifest.RepoUrl
+            Tags                = $manifest.Tags
+            CategoryTags        = $manifest.CategoryTags
+        }
+
+        $existing = Get-Content "pluginmaster-repo/pluginmaster.json" -Raw | ConvertFrom-Json
+        $filtered = @($existing | Where-Object { $_.InternalName -ne "TeaTimeDeck" })
+        $merged = $filtered + @($entry)
+
+        # -InputObject, not the pipeline: a one-entry pluginmaster would otherwise
+        # serialise as a bare object and Dalamud expects an array.
+        $json = ConvertTo-Json -InputObject @($merged) -Depth 10
+        Set-Content "pluginmaster-repo/pluginmaster.json" $json -Encoding utf8NoBOM
+
+        Push-Location pluginmaster-repo
+        git symbolic-ref HEAD refs/heads/master
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add pluginmaster.json
+
+        if (git diff --cached --quiet) {
+            Write-Host "pluginmaster.json already up to date; nothing to push."
+        } else {
+            git commit -m "Tea Time Deck v$version"
+            git push -u origin master
+        }
+        Pop-Location
