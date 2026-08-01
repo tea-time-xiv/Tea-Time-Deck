@@ -22,11 +22,40 @@ const INK = {
 	labelEdge: "rgba(201,172,112,0.30)",
 	text: "#f2efe6",
 	muted: "#8d93a6",
-	// Cool blue against the gold, for the browser's second row of blocks. Two pagers of
-	// one colour would read as one long strip rather than two separate things.
+	// Fallback for the type row, which otherwise colours itself per catalog below. Any
+	// colour but the gold, so the two pager rows never read as one long strip.
 	accent: "#7fb2e5",
 	accentEdge: "rgba(127,178,229,0.30)",
 } as const;
+
+/**
+ * A colour per catalog, so a block says which type it is as well as where in the cycle.
+ *
+ * Identity only: which block is lit still carries the position, because these hues are
+ * not all distinguishable to everyone and a key read across a room is read by brightness
+ * long before hue. Unknown kinds fall back to spares, so a catalog added by a later plugin
+ * version still gets its own colour rather than sharing one.
+ */
+const KIND_COLOURS: Record<string, string> = {
+	emote: "#7fb2e5",
+	mount: "#7fdc86",
+	minion: "#dd9bea",
+	gearset: "#efa76a",
+	action: "#f0766f",
+};
+
+const SPARE_COLOURS = ["#6fd6cf", "#c0a9f0", "#e8d27a", "#8fbf6a"];
+
+function kindColour(kind: string, index: number): string {
+	return KIND_COLOURS[kind] ?? SPARE_COLOURS[index % SPARE_COLOURS.length]!;
+}
+
+/** Hex to rgba, for the muted outline an unlit block wears in its own colour. */
+function fade(colour: string, alpha: number): string {
+	const value = Number.parseInt(colour.replace("#", ""), 16);
+
+	return `rgba(${(value >> 16) & 255},${(value >> 8) & 255},${value & 255},${alpha})`;
+}
 
 /** Gauge colours, taken from the bars the game draws for each resource. */
 const GAUGE: Record<string, { dark: string; light: string }> = {
@@ -298,23 +327,35 @@ export function renderMessage(heading: string, body: string): string {
  * Two rows of blocks rather than one row and a "3/8" caption. Both axes are positions in
  * a list, so both read fastest the same way, and the number said nothing the blocks did
  * not. The rows are told apart by colour and by height -- the type row is the shorter of
- * the two, because it is the one that changes least.
+ * the two, because it is the one that changes least, and each of its blocks wears its own
+ * catalog's colour.
  */
 export function renderBrowserKind(
 	title: string,
+	kinds: string[],
 	kindIndex: number,
-	kindCount: number,
 	page: number,
 	pageCount: number,
 ): string {
 	return frame(
 		centeredValue(truncate(title, 9), 62, title.length > 7 ? 28 : 34) +
-			pager(kindIndex, kindCount, 88, { max: 10, fill: INK.accent, edge: INK.accentEdge }) +
+			pager(kindIndex, Math.max(1, kinds.length), 88, {
+				max: 10,
+				fill: INK.accent,
+				edge: INK.accentEdge,
+				fills: kinds.map(kindColour),
+			}) +
 			pager(page, pageCount, 110, { max: 16, fill: INK.label, edge: INK.labelEdge }),
 	);
 }
 
-type PagerStyle = { max: number; fill: string; edge: string };
+type PagerStyle = {
+	max: number;
+	fill: string;
+	edge: string;
+	/** A colour per block, where the blocks stand for different things rather than steps. */
+	fills?: string[];
+};
 
 /**
  * A block per position, the current one lit. Reads at a glance, which a bare "3/8" does
@@ -334,10 +375,11 @@ function pager(index: number, count: number, y: number, style: PagerStyle): stri
 		// which light one at a time rather than accumulating.
 		const marker = Math.max(6, width / count);
 		const x = inset + (width - marker) * (count > 1 ? index / (count - 1) : 0);
+		const colour = style.fills?.[index] ?? style.fill;
 
 		return (
 			`<rect x="${inset}" y="${y}" width="${width}" height="${height}" rx="3" fill="${INK.trough}" stroke="${style.edge}" stroke-width="1"/>` +
-			`<rect x="${x.toFixed(1)}" y="${y}" width="${marker.toFixed(1)}" height="${height}" rx="3" fill="${style.fill}"/>`
+			`<rect x="${x.toFixed(1)}" y="${y}" width="${marker.toFixed(1)}" height="${height}" rx="3" fill="${colour}"/>`
 		);
 	}
 
@@ -347,8 +389,13 @@ function pager(index: number, count: number, y: number, style: PagerStyle): stri
 	return Array.from({ length: count }, (_, position) => {
 		const x = start + position * (size + gap);
 		const current = position === index;
+		const colour = style.fills?.[position] ?? style.fill;
 
-		return `<rect x="${x.toFixed(1)}" y="${y}" width="${size.toFixed(1)}" height="${size.toFixed(1)}" rx="2" fill="${current ? style.fill : INK.trough}" stroke="${current ? style.fill : style.edge}" stroke-width="1"/>`;
+		// Lit blocks are filled, unlit ones only outlined -- in their own colour, so the
+		// row still says what the cycle holds while brightness says where you are in it.
+		const edge = style.fills === undefined ? style.edge : fade(colour, 0.35);
+
+		return `<rect x="${x.toFixed(1)}" y="${y}" width="${size.toFixed(1)}" height="${size.toFixed(1)}" rx="2" fill="${current ? colour : INK.trough}" stroke="${current ? colour : edge}" stroke-width="1"/>`;
 	}).join("");
 }
 

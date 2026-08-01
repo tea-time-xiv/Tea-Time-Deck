@@ -103,8 +103,11 @@ types added by later versions. Useful once there are more types than you use, so
 a page that only wants emotes and gear sets does not press past three others.
 
 The **Switch Type** key carries the readout for the whole viewport: the type in
-large text over two rows of blocks — the type's place in the cycle in blue, the
-page in gold. Both axes are positions in a list, so both read the same way, and
+large text over two rows of blocks — the type's place in the cycle on top, the
+page in gold below. Each type has its own colour, so the top row shows what the
+cycle holds as well as where in it you are. That is identity, not state: the
+block you are on is the filled one, since brightness reads across a room where
+hue does not, and not everyone can tell the hues apart anyway. Both axes are positions in a list, so both read the same way, and
 the `3/8` caption that used to sit there said nothing the blocks did not. The
 type row is the shorter of the two, being the one that changes least.
 

@@ -270,7 +270,7 @@ class DeviceBrowser {
 			face = renderMessage("BROWSE", "offline");
 		} else {
 			const kind = await this.#kindView();
-			face = renderBrowserKind(kind.title, kind.index, kind.count, this.#page, pageCount);
+			face = renderBrowserKind(kind.title, kind.kinds, kind.index, this.#page, pageCount);
 		}
 
 		await Promise.all(
@@ -295,7 +295,7 @@ class DeviceBrowser {
 	 * list is cached after the first fetch, and a key that cannot say which type it is on
 	 * is worse than one that understates how many there are.
 	 */
-	async #kindView(): Promise<{ title: string; index: number; count: number }> {
+	async #kindView(): Promise<{ title: string; kinds: string[]; index: number }> {
 		const fallback = this.#kind ?? "";
 
 		try {
@@ -306,12 +306,13 @@ class DeviceBrowser {
 				// The server's own label, so the key reads "Gear Sets" rather than the
 				// wire name it happens to be filed under.
 				title: cycle[index]?.displayName ?? capitalise(fallback),
+				// The wire names, which are what the face colours its blocks by.
+				kinds: cycle.map((k) => k.kind),
 				index: Math.max(0, index),
-				count: Math.max(1, cycle.length),
 			};
 		} catch (error) {
 			streamDeck.logger.debug(`Could not resolve the type position: ${asMessage(error)}`);
-			return { title: capitalise(fallback), index: 0, count: 1 };
+			return { title: capitalise(fallback), kinds: fallback === "" ? [] : [fallback], index: 0 };
 		}
 	}
 
