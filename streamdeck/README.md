@@ -97,7 +97,11 @@ Slots are filled in reading order — top-left to bottom-right — regardless of
 where the navigation keys sit.
 
 The **Switch Type** key carries the readout for the whole viewport: the type in
-large text, the page as `3/8`, and a row of blocks with the current page lit.
+large text over two rows of blocks — the type's place in the cycle in blue, the
+page in gold. Both axes are positions in a list, so both read the same way, and
+the `3/8` caption that used to sit there said nothing the blocks did not. The
+type row is the shorter of the two, being the one that changes least.
+
 Past about twenty pages the blocks stop being countable, so they give way to a
 filled track. The paging keys show their arrows and nothing else — the same
 counter on three keys was repetition.

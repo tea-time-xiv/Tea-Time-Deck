@@ -228,7 +228,7 @@ class DeviceBrowser {
 		const face =
 			failure !== undefined
 				? renderMessage("BROWSE", "offline")
-				: renderBrowserKind(this.#kind ?? "", this.#page, pageCount);
+				: renderBrowserKind(this.#kind ?? "", ...(await this.#kindPosition()), this.#page, pageCount);
 
 		await Promise.all(
 			[...this.#navKeys.values()].map(async ({ action, role }) => {
@@ -243,6 +243,25 @@ class DeviceBrowser {
 				await action.setTitle(failure !== undefined ? "offline" : "");
 			}),
 		);
+	}
+
+	/**
+	 * Where the current type sits in the cycle, as [index, count], for the type pager.
+	 *
+	 * Falls back to a single lit block rather than throwing: the kind list is cached after
+	 * the first fetch, and a key that cannot say which type it is on is worse than one
+	 * that understates how many there are.
+	 */
+	async #kindPosition(): Promise<[number, number]> {
+		try {
+			const kinds = await xiv.getKinds();
+			const index = kinds.findIndex((k) => k.kind === this.#kind);
+
+			return [Math.max(0, index), Math.max(1, kinds.length)];
+		} catch (error) {
+			streamDeck.logger.debug(`Could not resolve the type position: ${asMessage(error)}`);
+			return [0, 1];
+		}
 	}
 
 	async #entries(): Promise<CatalogEntry[]> {

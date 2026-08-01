@@ -19,8 +19,13 @@ const INK = {
 	edgeHighlight: "rgba(255,255,255,0.10)",
 	trough: "#070910",
 	label: "#c9ac70",
+	labelEdge: "rgba(201,172,112,0.30)",
 	text: "#f2efe6",
 	muted: "#8d93a6",
+	// Cool blue against the gold, for the browser's second row of blocks. Two pagers of
+	// one colour would read as one long strip rather than two separate things.
+	accent: "#7fb2e5",
+	accentEdge: "rgba(127,178,229,0.30)",
 } as const;
 
 /** Gauge colours, taken from the bars the game draws for each resource. */
@@ -287,49 +292,65 @@ export function renderMessage(heading: string, body: string): string {
  * their arrows and nothing else -- three keys repeating the same counter was noise, and
  * this one is the key that is always present when a browser is set up.
  */
-export function renderBrowserKind(kind: string, page: number, pageCount: number): string {
+/**
+ * The readout for the whole viewport: which catalog, and where in it.
+ *
+ * Two rows of blocks rather than one row and a "3/8" caption. Both axes are positions in
+ * a list, so both read fastest the same way, and the number said nothing the blocks did
+ * not. The rows are told apart by colour and by height -- the type row is the shorter of
+ * the two, because it is the one that changes least.
+ */
+export function renderBrowserKind(
+	kind: string,
+	kindIndex: number,
+	kindCount: number,
+	page: number,
+	pageCount: number,
+): string {
 	const title = kind.charAt(0).toUpperCase() + kind.slice(1);
 
 	return frame(
 		centeredValue(truncate(title, 9), 62, title.length > 7 ? 28 : 34) +
-			`<text x="${SIZE / 2}" y="92" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="16" font-weight="600" fill="${INK.muted}">${page + 1}/${pageCount}</text>` +
-			pager(page, pageCount, 106),
+			pager(kindIndex, kindCount, 88, { max: 10, fill: INK.accent, edge: INK.accentEdge }) +
+			pager(page, pageCount, 110, { max: 16, fill: INK.label, edge: INK.labelEdge }),
 	);
 }
 
+type PagerStyle = { max: number; fill: string; edge: string };
+
 /**
- * A block per page, the current one lit. Reads as position at a glance, which a bare
- * "3/8" does not.
+ * A block per position, the current one lit. Reads at a glance, which a bare "3/8" does
+ * not.
  */
-function pager(page: number, pageCount: number, y: number): string {
+function pager(index: number, count: number, y: number, style: PagerStyle): string {
 	const inset = 12;
 	const width = SIZE - inset * 2;
 	const gap = 4;
-	const size = Math.min(16, (width - gap * (pageCount - 1)) / pageCount);
+	const size = Math.min(style.max, (width - gap * (count - 1)) / count);
 
 	// Past roughly twenty pages the blocks are too small to count, so stop pretending
 	// they are countable and show the position on a continuous track instead.
 	if (size < 5) {
-		const height = 12;
+		const height = Math.min(12, style.max);
 		// A marker that slides, not a fill that grows: the same reading as the blocks,
 		// which light one at a time rather than accumulating.
-		const marker = Math.max(6, width / pageCount);
-		const x = inset + (width - marker) * (pageCount > 1 ? page / (pageCount - 1) : 0);
+		const marker = Math.max(6, width / count);
+		const x = inset + (width - marker) * (count > 1 ? index / (count - 1) : 0);
 
 		return (
-			`<rect x="${inset}" y="${y}" width="${width}" height="${height}" rx="3" fill="${INK.trough}" stroke="rgba(201,172,112,0.30)" stroke-width="1"/>` +
-			`<rect x="${x.toFixed(1)}" y="${y}" width="${marker.toFixed(1)}" height="${height}" rx="3" fill="${INK.label}"/>`
+			`<rect x="${inset}" y="${y}" width="${width}" height="${height}" rx="3" fill="${INK.trough}" stroke="${style.edge}" stroke-width="1"/>` +
+			`<rect x="${x.toFixed(1)}" y="${y}" width="${marker.toFixed(1)}" height="${height}" rx="3" fill="${style.fill}"/>`
 		);
 	}
 
-	const span = size * pageCount + gap * (pageCount - 1);
+	const span = size * count + gap * (count - 1);
 	const start = (SIZE - span) / 2;
 
-	return Array.from({ length: pageCount }, (_, index) => {
-		const x = start + index * (size + gap);
-		const current = index === page;
+	return Array.from({ length: count }, (_, position) => {
+		const x = start + position * (size + gap);
+		const current = position === index;
 
-		return `<rect x="${x.toFixed(1)}" y="${y}" width="${size.toFixed(1)}" height="${size.toFixed(1)}" rx="2" fill="${current ? INK.label : INK.trough}" stroke="${current ? INK.label : "rgba(201,172,112,0.30)"}" stroke-width="1"/>`;
+		return `<rect x="${x.toFixed(1)}" y="${y}" width="${size.toFixed(1)}" height="${size.toFixed(1)}" rx="2" fill="${current ? style.fill : INK.trough}" stroke="${current ? style.fill : style.edge}" stroke-width="1"/>`;
 	}).join("");
 }
 
