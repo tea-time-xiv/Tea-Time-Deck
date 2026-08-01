@@ -21,12 +21,12 @@ should be pressable, an entry in `HotbarExecutor.SlotTypes`.
 | --- | --- | --- | --- |
 | Fashion accessories | `Ornament` | `IsOrnamentUnlocked` | `Ornament` |
 | Orchestrion rolls | `Orchestrion` | `IsOrchestrionUnlocked` | — |
-| Gear sets | `RaptureGearsetModule` (live, not a sheet) | n/a | `GearSet` |
 | Macros | `RaptureMacroModule` (live) | n/a | `Macro` |
 | Teleports | `Aetheryte` + `IAetheryteList` | n/a | — |
 
-Gear sets and macros are live modules rather than Excel sheets, so they need
-their own change detection instead of riding on the `Unlock` event.
+Gear sets are done. Macros are the other live module rather than an Excel sheet,
+so they need change detection instead of riding on the `Unlock` event — add them
+to `CatalogWatcher`, which already does exactly that for gear sets.
 
 ## 3. Status key extras
 

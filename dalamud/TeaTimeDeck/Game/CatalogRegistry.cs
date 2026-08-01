@@ -22,15 +22,30 @@ internal sealed class CatalogRegistry : IDisposable
     private readonly Dictionary<string, ICatalogProvider> providers;
     private readonly ConcurrentDictionary<string, IReadOnlyList<CatalogEntry>> cache = new();
 
+    /// <summary>
+    /// Kinds accumulated during the current burst window. Guarded because cached lists are
+    /// read from socket threads, so an invalidation can arrive from one too.
+    /// </summary>
+    private readonly HashSet<string> pendingKinds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly object noticeLock = new();
+
+    private bool pendingEveryKind;
     private bool noticeScheduled;
     private bool disposed;
 
-    /// <summary>Raised when cached entries were dropped and clients should refetch.</summary>
-    public event Action? Invalidated;
+    /// <summary>
+    /// Raised when cached entries were dropped and clients should refetch. Carries the
+    /// kinds affected, or null when every kind was.
+    /// </summary>
+    public event Action<IReadOnlyCollection<string>?>? Invalidated;
 
     public CatalogRegistry(Configuration config)
     {
-        providers = new ICatalogProvider[] { new EmoteCatalog(config), new MountCatalog(), new MinionCatalog() }
+        providers = new ICatalogProvider[]
+            {
+                new EmoteCatalog(config), new MountCatalog(), new MinionCatalog(), new GearSetCatalog(),
+                new ActionCatalog(),
+            }
             .ToDictionary(p => p.Kind, StringComparer.OrdinalIgnoreCase);
 
         Plugin.UnlockState.Unlock += OnUnlock;
@@ -56,46 +71,94 @@ internal sealed class CatalogRegistry : IDisposable
         return built;
     }
 
-    public void Invalidate()
+    /// <summary>
+    /// Drops cached entries and tells clients to refetch. Naming no kinds means every kind.
+    ///
+    /// Scoping this matters for the kinds that change often: a job change rebuilds that
+    /// job's actions, and throwing away the emote list at the same time would mean a full
+    /// sheet scan for nothing.
+    /// </summary>
+    public void Invalidate(params string[] kinds)
     {
-        // Notify even when nothing was cached here: clients keep their own copies, and an
-        // empty server cache says nothing about what a Stream Deck is currently showing.
-        cache.Clear();
-        NotifyInvalidated();
+        if (kinds.Length == 0)
+        {
+            // Notify even when nothing was cached here: clients keep their own copies, and an
+            // empty server cache says nothing about what a Stream Deck is currently showing.
+            cache.Clear();
+            NotifyInvalidated(null);
+            return;
+        }
+
+        // Resolve through the providers so what goes on the wire is the canonical spelling.
+        // The client matches these against its own cache keys, which are exact.
+        var resolved = new List<string>(kinds.Length);
+
+        foreach (var kind in kinds)
+        {
+            if (!providers.TryGetValue(kind, out var provider))
+            {
+                Plugin.Log.Warning("Ignoring invalidation of unknown catalog kind '{Kind}'.", kind);
+                continue;
+            }
+
+            cache.TryRemove(provider.Kind, out _);
+            resolved.Add(provider.Kind);
+        }
+
+        if (resolved.Count > 0)
+            NotifyInvalidated(resolved);
     }
 
     private void OnLogin()
     {
         // Unlock state belongs to the character, not the client.
-        cache.Clear();
-        NotifyInvalidated();
+        Invalidate();
     }
 
     private void OnUnlock(RowRef rowRef)
     {
         // The event does not say which catalog a row belongs to, and resolving that is
         // more work than rebuilding two lists. Drop everything and let clients refetch.
-        cache.Clear();
-        NotifyInvalidated();
+        Invalidate();
     }
 
     /// <summary>
     /// Trailing-edge debounce: a burst produces exactly one notice, fired after the burst
     /// ends. A leading-edge throttle would swallow the final unlock and leave clients stale.
+    ///
+    /// Kinds accumulate across the burst, and one unscoped invalidation swallows the rest --
+    /// a login landing on top of a job change already means "refetch everything".
     /// </summary>
-    private void NotifyInvalidated()
+    private void NotifyInvalidated(IReadOnlyCollection<string>? kinds)
     {
-        if (noticeScheduled || disposed)
-            return;
+        lock (noticeLock)
+        {
+            if (kinds is null)
+                pendingEveryKind = true;
+            else if (!pendingEveryKind)
+                pendingKinds.UnionWith(kinds);
 
-        noticeScheduled = true;
+            if (noticeScheduled || disposed)
+                return;
+
+            noticeScheduled = true;
+        }
 
         _ = Plugin.Framework.RunOnTick(
             () =>
             {
-                noticeScheduled = false;
+                IReadOnlyCollection<string>? affected;
+
+                lock (noticeLock)
+                {
+                    noticeScheduled = false;
+                    affected = pendingEveryKind ? null : pendingKinds.ToArray();
+                    pendingEveryKind = false;
+                    pendingKinds.Clear();
+                }
+
                 if (!disposed)
-                    Invalidated?.Invoke();
+                    Invalidated?.Invoke(affected);
             },
             delay: InvalidateBurstWindow);
     }

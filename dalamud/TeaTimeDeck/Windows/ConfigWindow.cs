@@ -78,8 +78,9 @@ public sealed class ConfigWindow : Window, IDisposable
         ImGui.Spacing();
         ImGui.TextWrapped("There is nothing to pair. The Stream Deck plugin finds this port on its " +
                           "own, and any program on this PC may drive your character while the box " +
-                          "above is ticked. Web pages cannot: they are refused. Untick it to close " +
-                          "the port entirely.");
+                          "above is ticked -- including using your job's actions and equipping gear " +
+                          "sets, one press at a time. Web pages cannot: they are refused. Untick it " +
+                          "to close the port entirely.");
 
         ImGui.Spacing();
         DrawEmoteCategories();
@@ -123,8 +124,9 @@ public sealed class ConfigWindow : Window, IDisposable
 
             config.Save();
 
-            // Drops the cached list and tells connected decks to refetch.
-            plugin.Catalogs.Invalidate();
+            // Drops the cached list and tells connected decks to refetch. Only the emote
+            // list is built from this setting, so nothing else needs rebuilding.
+            plugin.Catalogs.Invalidate("emote");
         }
     }
 }

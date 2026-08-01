@@ -38,12 +38,19 @@ Worth stating plainly, since there is no auth to hide behind:
 
 - `hello` returns the logged-in character's name. `/health` deliberately does
   not, so a probe that has not opened a socket learns nothing about you.
-- `execute` is limited to emotes, mounts and minions, and the id is looked up in
-  the catalog rather than trusted — so it can only fire something the character
-  has already unlocked. Raw actions, items and macros are not reachable.
+- `execute` covers emotes, mounts, minions, gear sets and the current job's
+  actions, and the id is looked up in the catalog rather than trusted — so it can
+  only fire something the character already has. Items and macros are not
+  reachable.
+- **That includes combat actions.** A local program can make your character
+  attack, and can equip a gear set. Both are one press at a time — see below —
+  but neither is cosmetic, and this is the honest reading of leaving the port open.
 - One execution per 100 ms, enforced server-side.
 
-Nothing here reads chat, moves the character, or touches combat.
+Nothing here reads chat or moves the character, and nothing queues, repeats or
+schedules: one request performs one action, the way one key press does. What the
+plugin will not do is play the game for you, and that is a property of the API
+surface rather than a promise about the caller.
 
 ## Message shape
 
@@ -138,7 +145,14 @@ Returns everything the player owns of that kind, in the game's own display order
 `category` is a grouping hint and may be null. `command` is informational; the
 server does not execute text commands.
 
-Results are cached and rebuilt only when the player unlocks something.
+Results are cached and rebuilt when the player unlocks something. Two kinds sit
+outside that: `gearset` is edited rather than unlocked, so it is polled once a
+second while a client is connected, and `action` describes the job you are on, so
+it is rebuilt whenever the job or its level changes.
+
+`action` holds both the job's own actions and its role actions. The role ones
+carry the category `Role Actions` rather than the one the sheet gives them, so
+they group together instead of scattering through the job's abilities.
 
 ### `execute`
 
@@ -165,12 +179,14 @@ Refused with an error response when:
 | Called again within 100 ms | `executing too fast; one action per press` |
 | No character loaded | `no character is logged in` |
 
-Only `emote` and `mount` are executable. `HotbarSlotType` covers far more —
-raw actions, items, macros — and those are deliberately not exposed, which
-keeps the API away from combat.
+`emote`, `mount`, `minion`, `gearset` and `action` are executable.
+`HotbarSlotType` covers more still — items, macros — and those remain unexposed.
 
 Entries are looked up in the catalog rather than passed through, so a client
-cannot execute anything the player has not unlocked.
+cannot execute anything the player does not have. For actions that means the
+list of the job you are on right now: a client holding yesterday's Paladin
+actions gets `action N is not in your catalog` after you switch, rather than
+firing something the current job cannot use.
 
 ### `icon.get`
 
@@ -268,9 +284,19 @@ Sampling is skipped entirely while no client is connected.
 
 ### `catalog.invalidated`
 
-No payload, no `id`. Cached lists were dropped; refetch what you are showing.
+No `id`. Cached lists were dropped; refetch what you are showing.
+
+```json
+{ "kinds": ["emote"] }
+```
+
+`kinds` names what was dropped. **An absent payload means every kind**, which is
+what this event meant before the field existed — a client that ignores it and
+refetches everything stays correct, just does more work than it needs to.
+
 Sent on unlock and on login, debounced — logging in replays every unlock the
-character has, and that must collapse into one notice.
+character has, and that must collapse into one notice. Kinds accumulate over the
+debounce window, and one unscoped invalidation inside it swallows the rest.
 
 ## Testing without a Stream Deck
 

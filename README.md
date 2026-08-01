@@ -66,7 +66,9 @@ unlocked:
 | Emotes | Done — categories can be hidden individually in `/ttd` |
 | Mounts | Done |
 | Minions | Done |
-| Fashion accessories, gear sets, macros, teleports, glamour plates | Planned |
+| Gear sets | Done — the browser follows renames and reordering on its own |
+| Actions | Done — the current job's, plus its role actions, repopulating when you switch |
+| Fashion accessories, macros, teleports, glamour plates | Planned |
 
 Read-only status keys, drawn as SVG in the game's own visual style:
 
@@ -87,6 +89,11 @@ One keypress equals one action, always. No auto-repeat, no queueing, no timers
 that fire actions, no conditional rotations, no chat-command injection. Actions
 are executed by writing a scratch hotbar slot and triggering it, the same
 mechanism the game itself uses for a keyboard press.
+
+Job and role actions are on the deck, so this does reach combat — a deck key
+casts the way a keyboard key casts. The line is not *which* actions are
+reachable but that nothing here decides *when* to press one. A rotation helper
+is not a smaller version of this project; it is a different one.
 
 ## Installing
 

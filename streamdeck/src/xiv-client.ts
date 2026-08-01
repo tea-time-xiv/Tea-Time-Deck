@@ -403,8 +403,10 @@ export class XivClient extends EventEmitter {
 		// No correlation id means it is a pushed event, not a reply.
 		if (message.id === undefined) {
 			if (message.type === "catalog.invalidated") {
-				streamDeck.logger.debug("Catalogs invalidated; dropping cache.");
-				this.#invalidate();
+				// No payload means every kind, which is what this event used to mean always.
+				const kinds = (message.payload as { kinds?: string[] } | undefined)?.kinds;
+				streamDeck.logger.debug(`Catalogs invalidated (${kinds?.join(", ") ?? "all"}); dropping cache.`);
+				this.#invalidate(kinds);
 				this.emit("invalidated");
 			} else if (message.type === "status.update") {
 				this.#status = message.payload as StatusSnapshot;
@@ -456,9 +458,22 @@ export class XivClient extends EventEmitter {
 		this.#pending.clear();
 	}
 
-	#invalidate(): void {
-		this.#catalogs.clear();
-		this.#kinds = undefined;
+	/**
+	 * Drops cached catalogs. Naming kinds drops only those; naming none drops everything,
+	 * which is what a reconnect or an unlock means.
+	 */
+	#invalidate(kinds?: string[]): void {
+		if (kinds === undefined) {
+			this.#catalogs.clear();
+			// Which kinds a server offers is a property of the server, not of what the
+			// character has unlocked, so only an unscoped drop can have changed it.
+			this.#kinds = undefined;
+			return;
+		}
+
+		for (const kind of kinds) {
+			this.#catalogs.delete(kind);
+		}
 	}
 }
 

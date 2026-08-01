@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Dalamud.Game.Command;
 using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
@@ -35,6 +36,7 @@ public sealed class Plugin : IDalamudPlugin
     internal IconService Icons { get; }
     internal ApiServer ApiServer { get; }
     internal StatusService Status { get; }
+    internal CatalogWatcher Watcher { get; }
 
     private ConfigWindow ConfigWindow { get; }
 
@@ -50,6 +52,9 @@ public sealed class Plugin : IDalamudPlugin
         // Created after the server: it samples only while something is connected.
         Status = new StatusService(ApiServer);
         ApiServer.AttachStatus(Status);
+
+        // Gear sets have no unlock event to ride on, so something has to look at them.
+        Watcher = new CatalogWatcher(ApiServer, Catalogs);
 
         // An unlock invalidates the cache; tell clients so their browsers refetch.
         Catalogs.Invalidated += OnCatalogsInvalidated;
@@ -83,6 +88,7 @@ public sealed class Plugin : IDalamudPlugin
 
         Catalogs.Invalidated -= OnCatalogsInvalidated;
 
+        Watcher.Dispose();
         Status.Dispose();
         ApiServer.Dispose();
         Catalogs.Dispose();
@@ -91,8 +97,12 @@ public sealed class Plugin : IDalamudPlugin
         ConfigWindow.Dispose();
     }
 
-    private void OnCatalogsInvalidated() =>
-        ApiServer.Broadcast(Message.Event("catalog.invalidated", null));
+    /// <summary>
+    /// Null kinds means every catalog, which is what the event has always meant: a client
+    /// that ignores the payload still refetches everything and stays correct.
+    /// </summary>
+    private void OnCatalogsInvalidated(IReadOnlyCollection<string>? kinds) =>
+        ApiServer.Broadcast(Message.Event("catalog.invalidated", kinds is null ? null : new { kinds }));
 
     private void OnCommand(string command, string args) => ToggleConfigUi();
 

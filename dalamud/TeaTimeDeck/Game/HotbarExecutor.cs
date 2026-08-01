@@ -26,8 +26,17 @@ internal sealed class HotbarExecutor
     private static readonly TimeSpan MinimumInterval = TimeSpan.FromMilliseconds(100);
 
     /// <summary>
-    /// Only kinds listed here can be executed. HotbarSlotType covers far more than this
-    /// (raw Actions, Items, Macros); leaving them out keeps the API away from combat.
+    /// Only kinds listed here can be executed. HotbarSlotType still covers more than this --
+    /// items, macros and the rest stay unreachable -- but job and role actions are exposed
+    /// deliberately, so this API does reach combat.
+    ///
+    /// What keeps that honest is above, not here: one request performs one action, there is
+    /// no queueing, repeat or scheduling, and the interval floor holds regardless of kind.
+    /// A key press fires one action, the same as pressing the hotbar would.
+    ///
+    /// Every kind stores its catalog id in the slot unchanged. Gear sets look like they
+    /// ought to be the exception, since the gear set list numbers them from one on screen,
+    /// but the slot wants the module's own id -- adding one equips the next gear set along.
     /// </summary>
     private static readonly Dictionary<string, HotbarSlotType> SlotTypes =
         new(StringComparer.OrdinalIgnoreCase)
@@ -35,6 +44,8 @@ internal sealed class HotbarExecutor
             ["emote"] = HotbarSlotType.Emote,
             ["mount"] = HotbarSlotType.Mount,
             ["minion"] = HotbarSlotType.Companion,
+            ["gearset"] = HotbarSlotType.GearSet,
+            ["action"] = HotbarSlotType.Action,
         };
 
     private readonly CatalogRegistry catalogs;
