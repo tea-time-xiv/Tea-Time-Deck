@@ -301,14 +301,12 @@ export function renderMessage(heading: string, body: string): string {
  * the two, because it is the one that changes least.
  */
 export function renderBrowserKind(
-	kind: string,
+	title: string,
 	kindIndex: number,
 	kindCount: number,
 	page: number,
 	pageCount: number,
 ): string {
-	const title = kind.charAt(0).toUpperCase() + kind.slice(1);
-
 	return frame(
 		centeredValue(truncate(title, 9), 62, title.length > 7 ? 28 : 34) +
 			pager(kindIndex, kindCount, 88, { max: 10, fill: INK.accent, edge: INK.accentEdge }) +

@@ -93,6 +93,7 @@
       "Name": "Browser: Switch Type",
       "Icon": "imgs/actions/kind/icon",
       "Tooltip": "Cycle the browser between emotes, mounts and anything else available.",
+      "PropertyInspectorPath": "ui/browser-kind.html",
       "Controllers": [
         "Keypad"
       ],

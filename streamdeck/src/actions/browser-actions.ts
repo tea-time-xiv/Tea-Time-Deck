@@ -1,12 +1,14 @@
 import streamDeck, {
 	action,
 	SingletonAction,
+	type DidReceiveSettingsEvent,
 	type KeyAction,
 	type KeyDownEvent,
+	type SendToPluginEvent,
 	type WillAppearEvent,
 	type WillDisappearEvent,
 } from "@elgato/streamdeck";
-import type { JsonObject } from "@elgato/utils";
+import type { JsonObject, JsonValue } from "@elgato/utils";
 
 import { browserFor, type BrowserKindSettings, type NavRole } from "../browser.js";
 import { xiv } from "../xiv-client.js";
@@ -127,6 +129,34 @@ export class BrowserKindAction extends BrowserNavAction<BrowserKindSettings> {
 
 		// Adopting repaints, so this replaces the base class's repaint rather than adding one.
 		await browser.adopt(ev.action, ev.payload.settings);
+	}
+
+	/**
+	 * Fires both when the inspector saves and when this browser persists its own type and
+	 * page, so it deliberately only acts on a changed allow-list.
+	 */
+	override onDidReceiveSettings(ev: DidReceiveSettingsEvent<BrowserKindSettings>): Promise<void> {
+		return browserFor(ev.action.device.id).applyAllowed(ev.payload.settings);
+	}
+
+	override onPropertyInspectorDidAppear(): Promise<void> | void {
+		// The inspector cannot ask until it has registered, so push the list at it.
+		return this.#sendKinds();
+	}
+
+	override async onSendToPlugin(ev: SendToPluginEvent<JsonValue, BrowserKindSettings>): Promise<void> {
+		if ((ev.payload as { event?: string })?.event === "getKinds") {
+			await this.#sendKinds();
+		}
+	}
+
+	async #sendKinds(): Promise<void> {
+		try {
+			const kinds = await xiv.getKinds();
+			await streamDeck.ui.sendToPropertyInspector({ event: "kinds", kinds });
+		} catch (error) {
+			await streamDeck.ui.sendToPropertyInspector({ event: "error", message: asMessage(error) });
+		}
 	}
 
 	protected override navigate(browser: ReturnType<typeof browserFor>): Promise<void> {

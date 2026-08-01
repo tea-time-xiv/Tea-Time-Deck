@@ -8,9 +8,14 @@ page number in its own settings. See the browser section of
 
 A fourth navigation action cycling the category filter within the current kind:
 All → each category → back. Useful for emotes (General / Expressions /
-Special) and now minions (grouped by race). Complements the config-side
+Special), minions (grouped by race) and actions, whose lists are long and split
+cleanly by the game's own Actions & Traits tabs. Complements the config-side
 category hiding rather than replacing it — hiding is permanent, this is
 per-session browsing.
+
+The Switch Type key's allow-list does the equivalent job one level up, so this
+should follow the same shape: chosen per key, stored in its settings, and
+defaulting to everything.
 
 ## 2. More catalogs
 

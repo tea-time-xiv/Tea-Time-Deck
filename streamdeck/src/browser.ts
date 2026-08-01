@@ -1,7 +1,7 @@
 import streamDeck, { type KeyAction } from "@elgato/streamdeck";
 
 import { renderBrowserKind, renderMessage, toDataUri } from "./status-render.js";
-import { xiv, type CatalogEntry } from "./xiv-client.js";
+import { xiv, type CatalogEntry, type CatalogKind } from "./xiv-client.js";
 
 /**
  * What a navigation key is for. The paging keys show their own arrow art and no text;
@@ -13,6 +13,8 @@ export type NavRole = "page" | "kind";
 export type BrowserKindSettings = {
 	kind?: string;
 	page?: number;
+	/** Types this key cycles through. Absent or empty means all of them. */
+	kinds?: string[];
 };
 
 /**
@@ -40,6 +42,15 @@ class DeviceBrowser {
 
 	#kind: string | undefined;
 	#page = 0;
+
+	/**
+	 * Types the Switch Type key cycles through, or undefined for all of them.
+	 *
+	 * Cycling one press at a time is fine for three types and tiresome for more, and the
+	 * server keeps growing them. A deck page that only ever wants emotes and gear sets can
+	 * say so here rather than pressing past the rest.
+	 */
+	#allowed: string[] | undefined;
 
 	/** Guards against overlapping repaints; the last request always wins. */
 	#painting = false;
@@ -74,6 +85,7 @@ class DeviceBrowser {
 	 */
 	public async adopt(action: KeyAction<BrowserKindSettings>, settings: BrowserKindSettings): Promise<void> {
 		this.#owner = action;
+		this.#allowed = allowedFrom(settings);
 
 		if (settings.kind !== undefined) {
 			this.#kind = settings.kind;
@@ -81,6 +93,31 @@ class DeviceBrowser {
 
 		if (settings.page !== undefined) {
 			this.#page = Math.max(0, settings.page);
+		}
+
+		await this.repaint();
+	}
+
+	/**
+	 * Takes a settings change from the property inspector. Only the allow-list can be
+	 * edited there, and the key writes its own type and page back constantly, so anything
+	 * else arriving here is an echo of what this browser just saved.
+	 */
+	public async applyAllowed(settings: BrowserKindSettings): Promise<void> {
+		const allowed = allowedFrom(settings);
+		if (sameKinds(allowed, this.#allowed)) {
+			return;
+		}
+
+		this.#allowed = allowed;
+
+		// The type on show may have just been excluded, in which case land on the first
+		// one still in the cycle rather than showing something the key can no longer reach.
+		const cycle = await this.#cycle();
+		if (cycle.length > 0 && !cycle.some((k) => k.kind === this.#kind)) {
+			this.#kind = cycle[0]!.kind;
+			this.#page = 0;
+			await this.#persist();
 		}
 
 		await this.repaint();
@@ -118,7 +155,7 @@ class DeviceBrowser {
 	}
 
 	public async changeKind(delta: number): Promise<void> {
-		const kinds = await xiv.getKinds();
+		const kinds = await this.#cycle();
 		if (kinds.length === 0) {
 			return;
 		}
@@ -142,7 +179,9 @@ class DeviceBrowser {
 		}
 
 		try {
-			await this.#owner.setSettings({ kind: this.#kind, page: this.#page });
+			// The allow-list goes back too: setSettings replaces the whole object, so
+			// leaving it out would wipe the inspector's choice on the next press.
+			await this.#owner.setSettings({ kind: this.#kind, page: this.#page, kinds: this.#allowed });
 		} catch (error) {
 			streamDeck.logger.debug(`Could not persist browser state: ${asMessage(error)}`);
 		}
@@ -225,10 +264,14 @@ class DeviceBrowser {
 	}
 
 	async #paintNav(pageCount: number, failure: string | undefined): Promise<void> {
-		const face =
-			failure !== undefined
-				? renderMessage("BROWSE", "offline")
-				: renderBrowserKind(this.#kind ?? "", ...(await this.#kindPosition()), this.#page, pageCount);
+		let face: string;
+
+		if (failure !== undefined) {
+			face = renderMessage("BROWSE", "offline");
+		} else {
+			const kind = await this.#kindView();
+			face = renderBrowserKind(kind.title, kind.index, kind.count, this.#page, pageCount);
+		}
 
 		await Promise.all(
 			[...this.#navKeys.values()].map(async ({ action, role }) => {
@@ -246,26 +289,47 @@ class DeviceBrowser {
 	}
 
 	/**
-	 * Where the current type sits in the cycle, as [index, count], for the type pager.
+	 * What the Switch Type key shows: the type's own name, and where it sits in the cycle.
 	 *
-	 * Falls back to a single lit block rather than throwing: the kind list is cached after
-	 * the first fetch, and a key that cannot say which type it is on is worse than one
-	 * that understates how many there are.
+	 * Falls back to the bare kind and a single lit block rather than throwing. The kind
+	 * list is cached after the first fetch, and a key that cannot say which type it is on
+	 * is worse than one that understates how many there are.
 	 */
-	async #kindPosition(): Promise<[number, number]> {
-		try {
-			const kinds = await xiv.getKinds();
-			const index = kinds.findIndex((k) => k.kind === this.#kind);
+	async #kindView(): Promise<{ title: string; index: number; count: number }> {
+		const fallback = this.#kind ?? "";
 
-			return [Math.max(0, index), Math.max(1, kinds.length)];
+		try {
+			const cycle = await this.#cycle();
+			const index = cycle.findIndex((k) => k.kind === this.#kind);
+
+			return {
+				// The server's own label, so the key reads "Gear Sets" rather than the
+				// wire name it happens to be filed under.
+				title: cycle[index]?.displayName ?? capitalise(fallback),
+				index: Math.max(0, index),
+				count: Math.max(1, cycle.length),
+			};
 		} catch (error) {
 			streamDeck.logger.debug(`Could not resolve the type position: ${asMessage(error)}`);
-			return [0, 1];
+			return { title: capitalise(fallback), index: 0, count: 1 };
 		}
 	}
 
+	/** The types this browser cycles through, in the server's order. */
+	async #cycle(): Promise<CatalogKind[]> {
+		const kinds = await xiv.getKinds();
+		if (this.#allowed === undefined) {
+			return kinds;
+		}
+
+		// An allow-list naming nothing the server offers would strand the key on a type it
+		// cannot leave, so treat it as no filter at all.
+		const filtered = kinds.filter((k) => this.#allowed!.includes(k.kind));
+		return filtered.length > 0 ? filtered : kinds;
+	}
+
 	async #entries(): Promise<CatalogEntry[]> {
-		this.#kind ??= (await xiv.getKinds())[0]?.kind;
+		this.#kind ??= (await this.#cycle())[0]?.kind;
 		if (this.#kind === undefined) {
 			return [];
 		}
@@ -323,6 +387,23 @@ function wrapTitle(name: string): string {
 
 	const half = Math.ceil(words.length / 2);
 	return `${words.slice(0, half).join(" ")}\n${words.slice(half).join(" ")}`;
+}
+
+/** An empty allow-list means the same as no allow-list: cycle everything. */
+function allowedFrom(settings: BrowserKindSettings): string[] | undefined {
+	return settings.kinds !== undefined && settings.kinds.length > 0 ? settings.kinds : undefined;
+}
+
+function sameKinds(a: string[] | undefined, b: string[] | undefined): boolean {
+	if (a === undefined || b === undefined) {
+		return a === b;
+	}
+
+	return a.length === b.length && a.every((kind, index) => kind === b[index]);
+}
+
+function capitalise(kind: string): string {
+	return kind.charAt(0).toUpperCase() + kind.slice(1);
 }
 
 function asMessage(error: unknown): string {
