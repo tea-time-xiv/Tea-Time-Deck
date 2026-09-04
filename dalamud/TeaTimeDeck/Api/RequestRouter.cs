@@ -69,6 +69,15 @@ internal sealed class RequestRouter
             var payload = await handler(envelope.Payload).ConfigureAwait(false);
             return Message.Reply(envelope.Id, envelope.Type, payload);
         }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            // Refusals are the API working, not failing: an id nobody owns, a design that
+            // has gone, a second press inside the interval. A client that sends bad
+            // requests in a loop must not be able to fill the game's log with stack
+            // traces, so these are one line and no trace.
+            Plugin.Log.Debug("Refused '{Type}': {Message}", envelope.Type, ex.Message);
+            return Message.Failure(envelope.Id, ex.Message);
+        }
         catch (Exception ex)
         {
             Plugin.Log.Error(ex, "Handler for '{Type}' threw.", envelope.Type);
