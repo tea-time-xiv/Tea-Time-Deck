@@ -49,7 +49,7 @@ public sealed class Plugin : IDalamudPlugin
 
         // Optional, and absent most of the time for most people: nothing below cares
         // whether Glamourer is installed, only whether it is answering right now.
-        Glamourer = new GlamourerIpc();
+        Glamourer = new GlamourerIpc(Configuration);
 
         Catalogs = new CatalogRegistry(Configuration, Glamourer);
 

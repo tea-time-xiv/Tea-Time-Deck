@@ -25,12 +25,9 @@ internal sealed class GlamourerIpc
     /// </summary>
     public readonly record struct Design(Guid Id, string Name, string FullPath, uint Color);
 
-    /// <summary>
-    /// Equipment | Customization, which is what <c>/glamour apply</c> sends. It does not
-    /// force both on: a design's own per-slot toggles still decide what it touches, so a
-    /// customization-only design leaves gear alone because it says so, not because of this.
-    /// </summary>
-    private const ulong ApplyEverythingTheDesignHolds = 2 | 4;
+    private const ulong EquipmentFlag = 2;
+
+    private const ulong CustomizationFlag = 4;
 
     /// <summary>
     /// The local player and nothing else -- Glamourer indexes the object table, where 0 is
@@ -45,6 +42,8 @@ internal sealed class GlamourerIpc
     /// </summary>
     private const uint NoLockKey = 0;
 
+    private readonly Configuration config;
+
     private readonly ICallGateSubscriber<(int Major, int Minor)> apiVersion;
 
     private readonly ICallGateSubscriber<Dictionary<Guid, (string DisplayName, string FullPath,
@@ -55,14 +54,32 @@ internal sealed class GlamourerIpc
     /// <summary>Logged once per Glamourer, so a mismatch shows up in the log rather than as silence.</summary>
     private bool versionLogged;
 
-    public GlamourerIpc()
+    public GlamourerIpc(Configuration config)
     {
+        this.config = config;
+
         apiVersion = Plugin.PluginInterface.GetIpcSubscriber<(int, int)>("Glamourer.ApiVersion.V2");
         designList = Plugin.PluginInterface
             .GetIpcSubscriber<Dictionary<Guid, (string, string, uint, bool)>>("Glamourer.GetDesignListExtended");
         applyDesign = Plugin.PluginInterface
             .GetIpcSubscriber<Guid, int, uint, ulong, int>("Glamourer.ApplyDesign");
     }
+
+    /// <summary>
+    /// What a press sends, from the setting in <c>/ttd</c>. Neither choice forces anything
+    /// on: a design's own per-slot toggles still decide what it touches, so asking for
+    /// everything a customization-only design holds still leaves gear alone.
+    /// </summary>
+    private ulong ApplyFlags => config.GlamourerApply == GlamourerApplyMode.CustomizationOnly
+        ? CustomizationFlag
+        : EquipmentFlag | CustomizationFlag;
+
+    /// <summary>
+    /// The chat command that would do what a press does, for the catalog to report. Nothing
+    /// sends it; it is there so a client can tell the user what a key is about to do.
+    /// </summary>
+    public string ApplyCommand =>
+        config.GlamourerApply == GlamourerApplyMode.CustomizationOnly ? "applycustomization" : "apply";
 
     /// <summary>
     /// Whether Glamourer is loaded and answering. Two field reads, so the watcher can ask
@@ -115,7 +132,7 @@ internal sealed class GlamourerIpc
         if (!Available)
             throw new InvalidOperationException("Glamourer is not installed or not loaded");
 
-        return applyDesign.InvokeFunc(design, LocalPlayerIndex, NoLockKey, ApplyEverythingTheDesignHolds);
+        return applyDesign.InvokeFunc(design, LocalPlayerIndex, NoLockKey, ApplyFlags);
     }
 
     /// <summary>Glamourer's own words for a result code, for the ones worth reporting.</summary>

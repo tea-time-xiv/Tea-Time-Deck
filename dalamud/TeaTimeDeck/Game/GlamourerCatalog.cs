@@ -50,9 +50,10 @@ internal sealed class GlamourerCatalog : ICatalogProvider
                 // Already ordered by path, so this keeps the deck's paging matching the
                 // order Glamourer's own list shows.
                 SortOrder: index,
-                // Informational, like every other kind's command. Execution goes over IPC:
+                // Informational, like every other kind's command, and it follows the apply
+                // setting so it says what a press will actually do. Execution goes over IPC:
                 // it reports success, and it cannot be seen by anyone else.
-                Command: $"/glamour apply \"{design.Name}\" | <me>",
+                Command: $"/glamour {glamourer.ApplyCommand} \"{design.Name}\" | <me>",
                 Key: design.Id.ToString("D")));
         }
 

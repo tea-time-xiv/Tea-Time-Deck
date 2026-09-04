@@ -178,7 +178,9 @@ another plugin, so it is polled on the same second — for edits while a client 
 connected, and for Glamourer itself loading or unloading either way.
 
 `glamourer` is listed even when Glamourer is not installed, and is simply empty
-then. A client that shows a type with no entries is showing the truth.
+then. A client that shows a type with no entries is showing the truth. A press on
+a key still holding a design from before is refused with `is not in your
+catalog`, the same as one whose design was deleted.
 
 `action` holds both the job's own actions and its role actions. The role ones
 carry the category `Role Actions` rather than the one the sheet gives them, so
@@ -222,9 +224,12 @@ Refused with an error response when:
 `HotbarSlotType` covers more still — items, macros — and those remain unexposed.
 
 The first five go through a hotbar scratch slot. `glamourer` does not: it calls
-Glamourer's `Glamourer.ApplyDesign` gate with `Equipment | Customization`, the
-same as `/glamour apply`, against object index 0 — the local player. What the
-design actually changes stays the design's own business. The 100 ms floor is
+Glamourer's `Glamourer.ApplyDesign` gate against object index 0 — the local
+player — with the flags chosen in `/ttd`, either `Equipment | Customization`
+(`/glamour apply`, the default) or `Customization` alone
+(`/glamour applycustomization`). It is one setting for every design, and the
+`command` a catalog entry reports follows it, so a client can show what a press
+will do. What the design actually changes stays the design's own business. The 100 ms floor is
 shared with the hotbar path rather than counted separately, so alternating
 between them buys nothing.
 

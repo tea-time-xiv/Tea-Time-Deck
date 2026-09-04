@@ -68,7 +68,7 @@ unlocked:
 | Minions | Done |
 | Gear sets | Done — the browser follows renames and reordering on its own |
 | Actions | Done — the current job's, plus its role actions, repopulating when you switch |
-| Glamourer designs | Done — when Glamourer is loaded; applied over its own API, never as a chat command |
+| Glamourer designs | Done — when Glamourer is loaded; applied over its own API, never as a chat command. `/ttd` chooses whether a press applies everything or appearance only |
 | Fashion accessories, macros, teleports, glamour plates | Planned |
 
 Read-only status keys, drawn as SVG in the game's own visual style:

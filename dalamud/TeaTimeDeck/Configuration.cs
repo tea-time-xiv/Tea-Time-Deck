@@ -4,6 +4,23 @@ using Dalamud.Configuration;
 
 namespace TeaTimeDeck;
 
+/// <summary>
+/// What pressing a Glamourer design key applies. One setting for every design rather than
+/// a choice per key: it is a preference about what this plugin is for, and a deck key that
+/// behaved differently from the one beside it would be a puzzle rather than a feature.
+/// </summary>
+public enum GlamourerApplyMode
+{
+    /// <summary>Everything the design holds, the same as <c>/glamour apply</c>.</summary>
+    Everything = 0,
+
+    /// <summary>
+    /// Appearance only, the same as <c>/glamour applycustomization</c>: race, face, hair
+    /// and the rest, leaving whatever the character is wearing alone.
+    /// </summary>
+    CustomizationOnly = 1,
+}
+
 [Serializable]
 public class Configuration : IPluginConfiguration
 {
@@ -26,6 +43,13 @@ public class Configuration : IPluginConfiguration
     /// Stored as row ids rather than names so the setting survives a language change.
     /// </summary>
     public List<uint> HiddenEmoteCategories { get; set; } = [];
+
+    /// <summary>
+    /// What a Glamourer design key applies. No version bump for this one: a config written
+    /// before it existed loads as <see cref="GlamourerApplyMode.Everything"/>, which is
+    /// exactly what those versions did.
+    /// </summary>
+    public GlamourerApplyMode GlamourerApply { get; set; } = GlamourerApplyMode.Everything;
 
     public static Configuration Load()
     {
