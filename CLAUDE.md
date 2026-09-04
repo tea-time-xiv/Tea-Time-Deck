@@ -140,6 +140,13 @@ invalidation landing in that window swallows the scoped ones. The event's
 `kinds` payload is optional: a client that ignores it refetches everything and
 is still correct.
 
+`Invalidate` bumps a generation counter, and `GetAsync` stores its result only if
+that counter has not moved across the framework hop. A build that was already in
+flight would otherwise write its pre-unlock list back into the cache the
+invalidation had just cleared — and the notice arriving two seconds later would
+serve exactly that. The request still gets the list it built; only the caching of
+it is dropped.
+
 ### Status pipeline
 
 `StatusService` samples on `Framework.Update` at 250 ms, serialises, and pushes
@@ -228,6 +235,16 @@ reconnects with 1 s→30 s backoff; requests fail cleanly while down and keys re
 `XIVLauncher*` profile most-recently-written first, falling back to 37985. The
 inspector's **Port** field is an override stored in global settings;
 `TEATIMEDECK_CONFIG` pins one exact file.
+
+`ApiServer.Stop` is the other half of that: it sends each session a `1000` close
+frame through that session's own write loop (a frame written from the stopping
+thread would race an in-flight `SendAsync`), waits up to 2 s for the replies, and
+only then cancels. So `1006` means the game went away and `1000` means the user
+did something. The cancellation token source is **not** disposed — sessions may
+still hold the token, and disposing under them turns their cancellation into an
+`ObjectDisposedException` — and sessions are left to remove themselves from the
+map, because clearing it early makes `SessionCount` read 0 while they drain,
+which is the condition `StatusService` and `CatalogWatcher` skip work on.
 
 ## Conventions
 

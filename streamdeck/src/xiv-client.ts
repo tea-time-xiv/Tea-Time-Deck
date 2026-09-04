@@ -361,9 +361,12 @@ export class XivClient extends EventEmitter {
 			}
 
 			// The game not running is the ordinary case, so say it once per drop rather
-			// than on every retry.
-			if (code === 1006 && this.#reconnectDelay === RECONNECT_MIN_MS) {
-				streamDeck.logger.info("Disconnected from FFXIV.");
+			// than on every retry. 1000 means the plugin closed the port on purpose --
+			// an untick or a port change, not a crash -- and is worth saying differently.
+			if (this.#reconnectDelay === RECONNECT_MIN_MS) {
+				streamDeck.logger.info(
+					code === 1000 ? "FFXIV closed the connection." : "Disconnected from FFXIV.",
+				);
 			}
 
 			this.#failPending(new Error("not connected to FFXIV"));
