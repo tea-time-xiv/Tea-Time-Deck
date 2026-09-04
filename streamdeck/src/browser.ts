@@ -256,6 +256,12 @@ class DeviceBrowser {
 
 		await slot.setTitle(wrapTitle(entry.name));
 
+		// Glamourer designs have no game artwork; the name alone is the key face.
+		if (entry.iconId === 0) {
+			await slot.setImage();
+			return;
+		}
+
 		try {
 			await slot.setImage(await xiv.getIcon(entry.iconId));
 		} catch {

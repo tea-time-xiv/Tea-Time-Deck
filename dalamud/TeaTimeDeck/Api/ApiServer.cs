@@ -33,10 +33,11 @@ internal sealed class ApiServer : IDisposable
     private CancellationTokenSource? cts;
     private Task? acceptLoop;
 
-    public ApiServer(Configuration config, CatalogRegistry catalogs, HotbarExecutor executor, IconService icons)
+    public ApiServer(Configuration config, CatalogRegistry catalogs, HotbarExecutor executor,
+        GlamourerExecutor designs, IconService icons)
     {
         this.config = config;
-        this.router = new RequestRouter(catalogs, executor, icons);
+        this.router = new RequestRouter(catalogs, executor, designs, icons);
     }
 
     /// <summary>

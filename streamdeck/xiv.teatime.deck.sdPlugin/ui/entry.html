@@ -261,7 +261,8 @@
 				entrySelect.innerHTML = "";
 
 				if (entries.length === 0) {
-					setStatus("nothing of this type is unlocked", "error");
+					// Not always "unlocked": a Glamourer that is not running has no designs.
+					setStatus("nothing of this type is available", "error");
 					return;
 				}
 
@@ -269,24 +270,40 @@
 
 				entries.forEach(function (entry) {
 					const option = document.createElement("option");
-					option.value = String(entry.id);
+					option.value = valueOf(entry);
 					option.textContent = entry.category ? entry.name + "  —  " + entry.category : entry.name;
 					entrySelect.appendChild(option);
 				});
 
-				const stillPresent = entries.some((e) => e.id === settings.id);
-				if (settings.id !== undefined && stillPresent) {
-					entrySelect.value = String(settings.id);
+				const saved = settings.key || (settings.id === undefined ? undefined : String(settings.id));
+				const stillPresent = entries.some((e) => valueOf(e) === saved);
+
+				if (saved !== undefined && stillPresent) {
+					entrySelect.value = saved;
 				} else {
 					// The saved entry is gone, or this key is new: adopt the first one.
 					selectEntry(entries[0]);
 				}
 			}
 
+			// Kinds the game does not number -- Glamourer designs -- are named by a key, and
+			// that key is what gets saved: a position in the list would come back pointing at
+			// a different design once one was added or deleted.
+			function valueOf(entry) {
+				return entry.key || String(entry.id);
+			}
+
 			function selectEntry(entry) {
 				settings.id = entry.id;
 				settings.name = entry.name;
 				settings.iconId = entry.iconId;
+
+				if (entry.key) {
+					settings.key = entry.key;
+				} else {
+					delete settings.key;
+				}
+
 				saveSettings();
 			}
 
@@ -302,12 +319,13 @@
 				delete settings.id;
 				delete settings.name;
 				delete settings.iconId;
+				delete settings.key;
 				saveSettings();
 				requestEntries();
 			});
 
 			entrySelect.addEventListener("change", function () {
-				const chosen = currentEntries.find((e) => String(e.id) === entrySelect.value);
+				const chosen = currentEntries.find((e) => valueOf(e) === entrySelect.value);
 				if (chosen) {
 					selectEntry(chosen);
 				}

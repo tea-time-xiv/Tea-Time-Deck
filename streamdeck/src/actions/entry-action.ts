@@ -18,6 +18,11 @@ export type EntrySettings = {
 	id?: number;
 	name?: string;
 	iconId?: number;
+	/**
+	 * For kinds the game does not number. Saved rather than the position in the list, so
+	 * a key still points at the design it was set to after others are added or deleted.
+	 */
+	key?: string;
 };
 
 /** Messages the property inspector sends us. */
@@ -35,20 +40,20 @@ export class EntryAction extends SingletonAction<EntrySettings> {
 	}
 
 	override async onKeyDown(ev: KeyDownEvent<EntrySettings>): Promise<void> {
-		const { kind, id } = ev.payload.settings;
+		const { kind, id, key } = ev.payload.settings;
 
-		if (kind === undefined || id === undefined) {
+		if (kind === undefined || (id === undefined && key === undefined)) {
 			streamDeck.logger.info("Key pressed before an entry was chosen.");
 			await ev.action.showAlert();
 			return;
 		}
 
 		try {
-			await xiv.execute(kind, id);
+			await xiv.execute(kind, id ?? 0, key);
 			await ev.action.showOk();
 		} catch (error) {
 			// Refusals are routine -- game closed, already mounted, wrong zone.
-			streamDeck.logger.info(`Could not execute ${kind} ${id}: ${asMessage(error)}`);
+			streamDeck.logger.info(`Could not execute ${kind} ${key ?? id}: ${asMessage(error)}`);
 			await ev.action.showAlert();
 		}
 	}
@@ -92,7 +97,8 @@ export class EntryAction extends SingletonAction<EntrySettings> {
 	async #render(target: WillAppearEvent<EntrySettings>["action"], settings: EntrySettings): Promise<void> {
 		await target.setTitle(settings.name ?? "Set\nentry");
 
-		if (settings.iconId === undefined) {
+		// 0 is an entry with no game artwork of its own, the same as having none.
+		if (settings.iconId === undefined || settings.iconId === 0) {
 			// No argument resets the key to the image declared in the manifest.
 			await target.setImage();
 			return;

@@ -39,12 +39,12 @@ internal sealed class CatalogRegistry : IDisposable
     /// </summary>
     public event Action<IReadOnlyCollection<string>?>? Invalidated;
 
-    public CatalogRegistry(Configuration config)
+    public CatalogRegistry(Configuration config, GlamourerIpc glamourer)
     {
         providers = new ICatalogProvider[]
             {
                 new EmoteCatalog(config), new MountCatalog(), new MinionCatalog(), new GearSetCatalog(),
-                new ActionCatalog(),
+                new ActionCatalog(), new GlamourerCatalog(glamourer),
             }
             .ToDictionary(p => p.Kind, StringComparer.OrdinalIgnoreCase);
 
@@ -53,7 +53,24 @@ internal sealed class CatalogRegistry : IDisposable
     }
 
     public IEnumerable<object> DescribeKinds() =>
-        providers.Values.Select(p => new { kind = p.Kind, displayName = p.DisplayName });
+        providers.Values.Select(p => new
+        {
+            kind = p.Kind,
+            displayName = p.DisplayName,
+            addressing = Describe(p.Addressing),
+        });
+
+    /// <summary>
+    /// Which field an <c>execute</c> of this kind has to carry. Asked by the router rather
+    /// than decided there, so adding a key-addressed kind is still one provider and nothing else.
+    /// </summary>
+    public CatalogAddressing AddressingOf(string kind) =>
+        providers.TryGetValue(kind, out var provider)
+            ? provider.Addressing
+            : throw new ArgumentException($"unknown catalog kind '{kind}'");
+
+    private static string Describe(CatalogAddressing addressing) =>
+        addressing == CatalogAddressing.Key ? "key" : "id";
 
     public async Task<IReadOnlyList<CatalogEntry>> GetAsync(string kind)
     {

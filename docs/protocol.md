@@ -38,10 +38,12 @@ Worth stating plainly, since there is no auth to hide behind:
 
 - `hello` returns the logged-in character's name. `/health` deliberately does
   not, so a probe that has not opened a socket learns nothing about you.
-- `execute` covers emotes, mounts, minions, gear sets and the current job's
-  actions, and the id is looked up in the catalog rather than trusted — so it can
-  only fire something the character already has. Items and macros are not
-  reachable.
+- `execute` covers emotes, mounts, minions, gear sets, the current job's actions
+  and — when Glamourer is loaded — its designs, and the id is looked up in the
+  catalog rather than trusted, so it can only fire something the character
+  already has. Items and macros are not reachable.
+- Applying a design goes to Glamourer over its IPC, aimed at object index 0: the
+  local player and nobody else. No chat command is sent for it, or for anything.
 - **That includes combat actions.** A local program can make your character
   attack, and can equip a gear set. Both are one press at a time — see below —
   but neither is cosmetic, and this is the honest reading of leaving the port open.
@@ -118,9 +120,13 @@ server version and whether anyone is logged in.
 No payload. Lists the browsers this server can populate.
 
 ```json
-{ "kinds": [ { "kind": "emote", "displayName": "Emotes" },
-             { "kind": "mount", "displayName": "Mounts" } ] }
+{ "kinds": [ { "kind": "emote", "displayName": "Emotes", "addressing": "id" },
+             { "kind": "glamourer", "displayName": "Glamourer", "addressing": "key" } ] }
 ```
+
+`addressing` says which field names an entry of that kind, and so which one an
+`execute` has to carry. Everything the game numbers is `id`; `glamourer` is
+`key`, because Glamourer names designs with GUIDs.
 
 ### `catalog.list`
 
@@ -141,14 +147,38 @@ Returns everything the player owns of that kind, in the game's own display order
 }
 ```
 
-`iconId` is a game icon id, not an image. Fetch images separately.
-`category` is a grouping hint and may be null. `command` is informational; the
-server does not execute text commands.
+```json
+{
+  "kind": "glamourer",
+  "count": 30,
+  "entries": [
+    { "kind": "glamourer", "id": 0, "name": "Elezen F", "iconId": 0,
+      "category": "Casual", "sortOrder": 3,
+      "command": "/glamour apply \"Elezen F\" | <me>",
+      "key": "10765f9e-9377-40d7-b3aa-c86d8dd41c33" }
+  ]
+}
+```
 
-Results are cached and rebuilt when the player unlocks something. Two kinds sit
+`iconId` is a game icon id, not an image. Fetch images separately. `0` means the
+entry has no game artwork at all, as Glamourer designs do not; do not request it.
+`category` is a grouping hint and may be null — for designs it is the folder
+Glamourer files them under. `command` is informational; the server does not
+execute text commands, designs included.
+
+`key` is present only on kinds whose `addressing` is `key`, where `id` is always
+`0` and carries no meaning. Clients that save an entry against a deck key must
+save the `key`, not a position: designs are added and deleted freely.
+
+Results are cached and rebuilt when the player unlocks something. Three kinds sit
 outside that: `gearset` is edited rather than unlocked, so it is polled once a
-second while a client is connected, and `action` describes the job you are on, so
-it is rebuilt whenever the job or its level changes.
+second while a client is connected, `action` describes the job you are on, so
+it is rebuilt whenever the job or its level changes, and `glamourer` belongs to
+another plugin, so it is polled on the same second — for edits while a client is
+connected, and for Glamourer itself loading or unloading either way.
+
+`glamourer` is listed even when Glamourer is not installed, and is simply empty
+then. A client that shows a type with no entries is showing the truth.
 
 `action` holds both the job's own actions and its role actions. The role ones
 carry the category `Role Actions` rather than the one the sheet gives them, so
@@ -160,7 +190,12 @@ they group together instead of scattering through the job's abilities.
 { "kind": "emote", "id": 16 }
 ```
 
-Performs the entry in-game.
+```json
+{ "kind": "glamourer", "key": "10765f9e-9377-40d7-b3aa-c86d8dd41c33" }
+```
+
+Performs the entry in-game. Which field is required follows the kind's
+`addressing`, not the client's preference.
 
 ```json
 { "kind": "emote", "id": 16, "name": "Wave", "usable": true, "result": 1 }
@@ -175,12 +210,23 @@ Refused with an error response when:
 | Condition | Error |
 | --- | --- |
 | Kind is not executable | `kind 'item' cannot be executed` |
+| Kind does not exist | `unknown catalog kind 'ornament'` |
 | Id is not owned or does not exist | `emote 99999 is not in your catalog` |
+| Key is not in the catalog | `glamourer 10765f9e-… is not in your catalog` |
 | Called again within 100 ms | `executing too fast; one action per press` |
 | No character loaded | `no character is logged in` |
+| Glamourer stopped between list and press | `Glamourer is not installed or not loaded` |
+| Glamourer refused | its own words, e.g. `that design no longer exists in Glamourer` |
 
-`emote`, `mount`, `minion`, `gearset` and `action` are executable.
+`emote`, `mount`, `minion`, `gearset`, `action` and `glamourer` are executable.
 `HotbarSlotType` covers more still — items, macros — and those remain unexposed.
+
+The first five go through a hotbar scratch slot. `glamourer` does not: it calls
+Glamourer's `Glamourer.ApplyDesign` gate with `Equipment | Customization`, the
+same as `/glamour apply`, against object index 0 — the local player. What the
+design actually changes stays the design's own business. The 100 ms floor is
+shared with the hotbar path rather than counted separately, so alternating
+between them buys nothing.
 
 Entries are looked up in the catalog rather than passed through, so a client
 cannot execute anything the player does not have. For actions that means the

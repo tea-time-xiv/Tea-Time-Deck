@@ -13,11 +13,15 @@ export type CatalogEntry = {
 	category: string | null;
 	sortOrder: number;
 	command: string | null;
+	/** Set only by kinds the game does not number -- Glamourer designs are GUIDs. */
+	key?: string | null;
 };
 
 export type CatalogKind = {
 	kind: string;
 	displayName: string;
+	/** Which field names an entry of this kind. Absent from older servers, where it is always "id". */
+	addressing?: "id" | "key";
 };
 
 /** Read-only game state for the status keys, pushed by the plugin when it changes. */
@@ -165,8 +169,12 @@ export class XivClient extends EventEmitter {
 		this.#connect();
 	}
 
-	public async execute(kind: string, id: number): Promise<void> {
-		await this.#request("execute", { kind, id });
+	/**
+	 * A key-addressed kind sends its key instead of an id; the server decides which it
+	 * wants from the kind, so sending both is harmless and sending neither is not.
+	 */
+	public async execute(kind: string, id: number, key?: string | null): Promise<void> {
+		await this.#request("execute", key ? { kind, key } : { kind, id });
 	}
 
 	public async getKinds(): Promise<CatalogKind[]> {
@@ -206,7 +214,8 @@ export class XivClient extends EventEmitter {
 	 * of round trips before the page finished drawing.
 	 */
 	public async primeIcons(iconIds: number[]): Promise<void> {
-		const missing = [...new Set(iconIds)].filter((id) => !this.#icons.has(id));
+		// 0 means the entry has no game artwork at all, so there is nothing to fetch.
+		const missing = [...new Set(iconIds)].filter((id) => id !== 0 && !this.#icons.has(id));
 
 		for (let i = 0; i < missing.length; i += ICON_BATCH_SIZE) {
 			const batch = missing.slice(i, i + ICON_BATCH_SIZE);

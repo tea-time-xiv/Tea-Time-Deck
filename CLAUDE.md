@@ -81,6 +81,13 @@ constructor's provider array, and — only if it should be pressable — one ent
 in `HotbarExecutor.SlotTypes`. `docs/next-steps.md` lists the planned ones with
 their sheets and unlock checks.
 
+A kind whose ids the game does not mint sets `Addressing => CatalogAddressing.Key`
+and fills `CatalogEntry.Key`; `execute` then wants `key` rather than `id`, which
+the router asks the registry about rather than deciding by name. `glamourer` is
+the only one so far, and the reason is durability, not taste: deck keys store
+what they were set to, and a saved list position would come back pointing at a
+different design after the next add or delete.
+
 Every kind so far stores its catalog id in the hotbar slot unchanged, gear sets
 included — the gear set list numbers them from one on screen, but the slot wants
 the module's own id, and adding one equips the next gear set along. Verified in
@@ -88,8 +95,10 @@ game, not assumed; if a future kind really does need an offset, that is the poin
 to reintroduce one.
 
 Catalogs the `Unlock` event does not cover are polled by `CatalogWatcher` at
-1 Hz: gear sets (edited, not unlocked — hash and compare) and the action list
-(which belongs to the current job, so a job switch or a level replaces it).
+1 Hz: gear sets (edited, not unlocked — hash and compare), the action list
+(which belongs to the current job, so a job switch or a level replaces it) and
+Glamourer designs (another plugin's, so both the list and Glamourer's own
+presence are watched).
 
 Two rules there are load-bearing. The gear set hash is skipped while no client is
 connected, but the job check is **not** — it is two field reads, and a job switch
@@ -150,28 +159,51 @@ port:
 
 - Any request carrying an `Origin` header gets `403`. Browsers always send one,
   native clients never do. This is the whole cross-site defence — do not relax it.
-- `execute` covers `emote`/`mount`/`minion`/`gearset`/`action`, and the id is
-  **looked up in the catalog**, never passed through, so only things the character
-  actually has can fire — for actions, only the job they are on right now. Items
-  and macros stay unreachable.
+- `execute` covers `emote`/`mount`/`minion`/`gearset`/`action`/`glamourer`, and the
+  id is **looked up in the catalog**, never passed through, so only things the
+  character actually has can fire — for actions, only the job they are on right
+  now. Items and macros stay unreachable.
 - Job and role actions are exposed deliberately, so this API **does** reach
   combat. The line that matters is not which actions are reachable but that
   nothing decides when to press one: one request, one action, no queueing or
   repeat or scheduling. Keep that property when adding kinds; it is what the
   100 ms floor and the absence of any timer-driven execution exist to protect.
-- One execution per 100 ms, enforced server-side.
+- One execution per 100 ms, enforced server-side by the single `ExecutionGate`
+  both executors claim. A new kind must claim the same gate; a private timer
+  would quietly turn the floor into a per-kind one.
+- Glamourer designs are applied over Glamourer's IPC at object index 0 — the local
+  player — never by sending `/glamour apply`. The no-chat-command rule below is
+  the reason, and the IPC also answers with a result code a text command cannot.
 - Max 8 sessions; `/health` deliberately reveals nothing about the character.
 
 ### Scope discipline
 
 One keypress equals one action. No auto-repeat, no queueing, no timers that fire
-actions, no conditional rotations, no chat-command injection. Execution writes
-`RaptureHotbarModule`'s dedicated `ScratchSlot` and triggers it, so no real
-hotbar slot is written to, saved over or restored — that is also what keeps
-XIVDeck (port 37984, `dev.wolf.xivdeck`) able to run alongside this.
+actions, no conditional rotations, no chat-command injection. Game execution
+writes `RaptureHotbarModule`'s dedicated `ScratchSlot` and triggers it, so no
+real hotbar slot is written to, saved over or restored — that is also what keeps
+XIVDeck (port 37984, `dev.wolf.xivdeck`) able to run alongside this. Kinds another
+plugin owns go to that plugin's API instead, which is the same rule seen from the
+other side: ask the owner, do not type at the game.
 
 The `usable` flag is reported, not enforced: the game refuses and explains
 better than this plugin could.
+
+### Talking to other plugins
+
+`GlamourerIpc` is the pattern: hand-rolled `ICallGateSubscriber` gates, no
+reference to the other plugin's API package. It works because every gate needed
+is typed in primitives (`Glamourer.ApplyDesign` takes a `Guid`, two integers and
+a `ulong` of flags, and returns an `int`) — a gate typed in the other plugin's
+own enums cannot be called this way at all, because Dalamud matches the delegate
+type exactly, and would force the package reference.
+
+Availability is `HasFunction` on the gates, checked per poll rather than
+subscribed to, and the absence of the other plugin is never an error: the catalog
+is empty, the type still lists, and the key says so when pressed. The labels
+(`Glamourer.GetDesignListExtended`, `Glamourer.ApplyDesign`) are the whole
+contract — verify them against the installed `Glamourer.Api.dll` rather than
+against memory if designs ever stop appearing.
 
 ### Client resilience
 
