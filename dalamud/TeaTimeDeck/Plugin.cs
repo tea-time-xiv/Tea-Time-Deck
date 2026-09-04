@@ -31,8 +31,11 @@ public sealed class Plugin : IDalamudPlugin
 
     internal readonly WindowSystem WindowSystem = new("TeaTimeDeck");
     internal Configuration Configuration { get; }
+    internal GlamourerIpc Glamourer { get; }
     internal CatalogRegistry Catalogs { get; }
+    internal ExecutionGate Gate { get; }
     internal HotbarExecutor Executor { get; }
+    internal GlamourerExecutor Designs { get; }
     internal IconService Icons { get; }
     internal ApiServer ApiServer { get; }
     internal StatusService Status { get; }
@@ -44,17 +47,28 @@ public sealed class Plugin : IDalamudPlugin
     {
         Configuration = Configuration.Load();
 
-        Catalogs = new CatalogRegistry(Configuration);
-        Executor = new HotbarExecutor(Catalogs);
+        // Optional, and absent most of the time for most people: nothing below cares
+        // whether Glamourer is installed, only whether it is answering right now.
+        Glamourer = new GlamourerIpc(Configuration);
+
+        Catalogs = new CatalogRegistry(Configuration, Glamourer);
+
+        // One gate for both executors, so the 100 ms floor cannot be walked around by
+        // pressing a design key and a hotbar key alternately.
+        Gate = new ExecutionGate();
+        Executor = new HotbarExecutor(Catalogs, Gate);
+        Designs = new GlamourerExecutor(Catalogs, Glamourer, Gate);
+
         Icons = new IconService();
-        ApiServer = new ApiServer(Configuration, Catalogs, Executor, Icons);
+        ApiServer = new ApiServer(Configuration, Catalogs, Executor, Designs, Icons);
 
         // Created after the server: it samples only while something is connected.
         Status = new StatusService(ApiServer);
         ApiServer.AttachStatus(Status);
 
-        // Gear sets have no unlock event to ride on, so something has to look at them.
-        Watcher = new CatalogWatcher(ApiServer, Catalogs);
+        // Gear sets and Glamourer designs have no unlock event to ride on, so something
+        // has to look at them.
+        Watcher = new CatalogWatcher(ApiServer, Catalogs, Glamourer);
 
         // An unlock invalidates the cache; tell clients so their browsers refetch.
         Catalogs.Invalidated += OnCatalogsInvalidated;

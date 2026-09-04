@@ -16,15 +16,12 @@ namespace TeaTimeDeck.Game;
 /// Scope discipline, deliberately enforced here rather than left to the client:
 /// one request executes one thing, only things the player already owns, only of the
 /// kinds this plugin exposes. There is no queueing, no repeat and no scheduling.
+///
+/// The interval floor lives in <see cref="ExecutionGate"/> rather than here, so that
+/// executing something Glamourer owns cannot sidestep the one this holds.
 /// </summary>
 internal sealed class HotbarExecutor
 {
-    /// <summary>
-    /// Floor on the gap between executions. A human pressing a key cannot beat this;
-    /// a script trying to drive the game through the API can, and gets refused.
-    /// </summary>
-    private static readonly TimeSpan MinimumInterval = TimeSpan.FromMilliseconds(100);
-
     /// <summary>
     /// Only kinds listed here can be executed. HotbarSlotType still covers more than this --
     /// items, macros and the rest stay unreachable -- but job and role actions are exposed
@@ -49,11 +46,12 @@ internal sealed class HotbarExecutor
         };
 
     private readonly CatalogRegistry catalogs;
-    private DateTime lastExecution = DateTime.MinValue;
+    private readonly ExecutionGate gate;
 
-    public HotbarExecutor(CatalogRegistry catalogs)
+    public HotbarExecutor(CatalogRegistry catalogs, ExecutionGate gate)
     {
         this.catalogs = catalogs;
+        this.gate = gate;
     }
 
     public async Task<object> ExecuteAsync(string kind, uint id)
@@ -74,14 +72,7 @@ internal sealed class HotbarExecutor
 
     private unsafe object Execute(CatalogEntry entry, HotbarSlotType slotType)
     {
-        if (!Plugin.PlayerState.IsLoaded)
-            throw new InvalidOperationException("no character is logged in");
-
-        var now = DateTime.UtcNow;
-        if (now - lastExecution < MinimumInterval)
-            throw new InvalidOperationException("executing too fast; one action per press");
-
-        lastExecution = now;
+        gate.Claim();
 
         var module = RaptureHotbarModule.Instance();
         if (module is null)

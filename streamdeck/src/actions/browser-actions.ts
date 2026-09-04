@@ -51,7 +51,7 @@ export class BrowserSlotAction extends SingletonAction<NoSettings> {
 		}
 
 		try {
-			await xiv.execute(entry.kind, entry.id);
+			await xiv.execute(entry.kind, entry.id, entry.key);
 			await ev.action.showOk();
 		} catch (error) {
 			streamDeck.logger.info(`Could not execute ${entry.kind} ${entry.id}: ${asMessage(error)}`);

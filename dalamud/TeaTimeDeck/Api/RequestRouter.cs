@@ -20,12 +20,15 @@ internal sealed class RequestRouter
     private readonly Dictionary<string, Func<JsonElement?, Task<object?>>> handlers;
     private readonly CatalogRegistry catalogs;
     private readonly HotbarExecutor executor;
+    private readonly GlamourerExecutor designs;
     private readonly IconService icons;
 
-    public RequestRouter(CatalogRegistry catalogs, HotbarExecutor executor, IconService icons)
+    public RequestRouter(CatalogRegistry catalogs, HotbarExecutor executor, GlamourerExecutor designs,
+        IconService icons)
     {
         this.catalogs = catalogs;
         this.executor = executor;
+        this.designs = designs;
         this.icons = icons;
 
         handlers = new Dictionary<string, Func<JsonElement?, Task<object?>>>(StringComparer.OrdinalIgnoreCase)
@@ -65,6 +68,15 @@ internal sealed class RequestRouter
         {
             var payload = await handler(envelope.Payload).ConfigureAwait(false);
             return Message.Reply(envelope.Id, envelope.Type, payload);
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            // Refusals are the API working, not failing: an id nobody owns, a design that
+            // has gone, a second press inside the interval. A client that sends bad
+            // requests in a loop must not be able to fill the game's log with stack
+            // traces, so these are one line and no trace.
+            Plugin.Log.Debug("Refused '{Type}': {Message}", envelope.Type, ex.Message);
+            return Message.Failure(envelope.Id, ex.Message);
         }
         catch (Exception ex)
         {
@@ -117,12 +129,18 @@ internal sealed class RequestRouter
         };
     }
 
+    /// <summary>
+    /// Which field identifies the entry follows the kind, not the client: Glamourer designs
+    /// are GUIDs and have no row id to send, everything else has an id and no key.
+    /// </summary>
     private async Task<object?> HandleExecute(JsonElement? payload)
     {
         var kind = RequireString(payload, "kind");
-        var id = RequireUInt32(payload, "id");
 
-        return await executor.ExecuteAsync(kind, id).ConfigureAwait(false);
+        if (catalogs.AddressingOf(kind) == CatalogAddressing.Key)
+            return await designs.ExecuteAsync(kind, RequireString(payload, "key")).ConfigureAwait(false);
+
+        return await executor.ExecuteAsync(kind, RequireUInt32(payload, "id")).ConfigureAwait(false);
     }
 
     private async Task<object?> HandleIconGet(JsonElement? payload)

@@ -3,6 +3,7 @@ using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
 using Lumina.Excel.Sheets;
+using TeaTimeDeck.Game;
 
 namespace TeaTimeDeck.Windows;
 
@@ -83,7 +84,57 @@ public sealed class ConfigWindow : Window, IDisposable
                           "to close the port entirely.");
 
         ImGui.Spacing();
+        DrawGlamourer();
+
+        ImGui.Spacing();
         DrawEmoteCategories();
+    }
+
+    /// <summary>
+    /// One switch for every design key. Glamourer's own commands are the two things a
+    /// press can sensibly mean, so the options are named after them rather than after
+    /// flags nobody outside this file has heard of.
+    /// </summary>
+    private void DrawGlamourer()
+    {
+        ImGui.TextUnformatted("Glamourer designs");
+        ImGui.Separator();
+
+        if (plugin.Glamourer.Available)
+        {
+            ImGui.TextColored(Green, "Glamourer is loaded; your designs are on the deck.");
+        }
+        else
+        {
+            ImGui.TextDisabled("Glamourer is not loaded. The Glamourer type stays empty until it is.");
+        }
+
+        var mode = config.GlamourerApply;
+
+        var everything = mode == GlamourerApplyMode.Everything;
+        if (ImGui.RadioButton("Everything the design holds  (/glamour apply)", everything))
+            SetApplyMode(GlamourerApplyMode.Everything);
+
+        var appearanceOnly = mode == GlamourerApplyMode.CustomizationOnly;
+        if (ImGui.RadioButton("Appearance only  (/glamour applycustomization)", appearanceOnly))
+            SetApplyMode(GlamourerApplyMode.CustomizationOnly);
+
+        ImGui.TextWrapped("Appearance only leaves what you are wearing alone. Either way a design " +
+                          "still decides for itself what it carries, so one that holds no gear " +
+                          "changes none under both settings.");
+    }
+
+    private void SetApplyMode(GlamourerApplyMode mode)
+    {
+        if (config.GlamourerApply == mode)
+            return;
+
+        config.GlamourerApply = mode;
+        config.Save();
+
+        // Only the reported command text is built from this, but a deck showing
+        // "/glamour apply" while a press applies appearance only would be lying.
+        plugin.Catalogs.Invalidate(GlamourerCatalog.KindName);
     }
 
     private void DrawEmoteCategories()

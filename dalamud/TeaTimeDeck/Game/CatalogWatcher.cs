@@ -9,9 +9,10 @@ namespace TeaTimeDeck.Game;
 /// Change detection for the catalogs the <c>Unlock</c> event does not cover.
 ///
 /// Most catalogs only change when the player unlocks something, and the game raises an
-/// event for that. Two kinds do not fit: gear sets have no event because they are edited,
-/// renamed and reordered at will, and the action list belongs to the current job rather
-/// than to the character, so it is replaced entirely by a job switch or a level.
+/// event for that. Three kinds do not fit: gear sets have no event because they are edited,
+/// renamed and reordered at will, the action list belongs to the current job rather
+/// than to the character, so it is replaced entirely by a job switch or a level, and
+/// Glamourer designs belong to another plugin that may not even be loaded.
 ///
 /// Polling is cheap enough to be uninteresting: two field reads, plus a hash over a
 /// hundred fixed-size entries while a deck is connected to see the result.
@@ -26,6 +27,7 @@ internal sealed class CatalogWatcher : IDisposable
 
     private readonly ApiServer server;
     private readonly CatalogRegistry catalogs;
+    private readonly GlamourerIpc glamourer;
 
     private DateTime lastPoll = DateTime.MinValue;
     private int lastGearSetHash;
@@ -40,10 +42,15 @@ internal sealed class CatalogWatcher : IDisposable
     private short lastJobLevel;
     private bool jobPrimed;
 
-    public CatalogWatcher(ApiServer server, CatalogRegistry catalogs)
+    private int lastDesignHash;
+    private bool designsPrimed;
+    private bool glamourerWasAvailable;
+
+    public CatalogWatcher(ApiServer server, CatalogRegistry catalogs, GlamourerIpc glamourer)
     {
         this.server = server;
         this.catalogs = catalogs;
+        this.glamourer = glamourer;
 
         Plugin.Framework.Update += OnUpdate;
     }
@@ -73,6 +80,8 @@ internal sealed class CatalogWatcher : IDisposable
             // caught on the first poll after something connects.
             if (server.SessionCount > 0)
                 CheckGearSets();
+
+            CheckDesigns();
         }
         catch (Exception ex)
         {
@@ -124,6 +133,72 @@ internal sealed class CatalogWatcher : IDisposable
         lastGearSetHash = hash;
         Plugin.Log.Debug("Gear sets changed; invalidating that catalog.");
         catalogs.Invalidate("gearset");
+    }
+
+    /// <summary>
+    /// Glamourer designs, which change for two reasons rather than one: the design list
+    /// itself is edited, and Glamourer can be loaded or unloaded under us. Availability is
+    /// two field reads and is checked whether or not a client is connected, so the type
+    /// appears and disappears with the plugin; reading the list costs an IPC call and a
+    /// dictionary, so that waits for a client the way gear sets do.
+    ///
+    /// Both sit behind the logged-in check above, which costs nothing: logging in
+    /// invalidates every catalog anyway, so anything missed at the title screen is
+    /// already covered.
+    /// </summary>
+    private void CheckDesigns()
+    {
+        var available = glamourer.Available;
+
+        if (available != glamourerWasAvailable)
+        {
+            glamourerWasAvailable = available;
+
+            // Whatever the list looked like belonged to the Glamourer that just went away.
+            designsPrimed = false;
+
+            Plugin.Log.Debug("Glamourer is now {State}; invalidating the design catalog.",
+                available ? "loaded" : "gone");
+            catalogs.Invalidate(GlamourerCatalog.KindName);
+            return;
+        }
+
+        if (!available || server.SessionCount == 0)
+            return;
+
+        var hash = HashDesigns();
+
+        if (!designsPrimed)
+        {
+            lastDesignHash = hash;
+            designsPrimed = true;
+            return;
+        }
+
+        if (hash == lastDesignHash)
+            return;
+
+        lastDesignHash = hash;
+        Plugin.Log.Debug("Glamourer designs changed; invalidating that catalog.");
+        catalogs.Invalidate(GlamourerCatalog.KindName);
+    }
+
+    /// <summary>
+    /// What the deck shows of a design: that it exists, its name, and the folder it is
+    /// filed under. What the design actually puts on the character is Glamourer's business.
+    /// </summary>
+    private int HashDesigns()
+    {
+        var hash = new HashCode();
+
+        foreach (var design in glamourer.List())
+        {
+            hash.Add(design.Id);
+            hash.Add(design.Name);
+            hash.Add(design.FullPath);
+        }
+
+        return hash.ToHashCode();
     }
 
     /// <summary>
