@@ -27,7 +27,17 @@ internal sealed class ApiSession
     private readonly Channel<string> outbound = Channel.CreateBounded<string>(
         new BoundedChannelOptions(256) { FullMode = BoundedChannelFullMode.DropOldest });
 
+    /// <summary>
+    /// Completes when the session has finished unwinding, so a shutdown can wait for the
+    /// close handshake instead of cancelling out from under it.
+    /// </summary>
+    private readonly TaskCompletionSource finished = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    private volatile bool closeRequested;
+
     public Guid Id { get; } = Guid.NewGuid();
+
+    public Task Completion => finished.Task;
 
     public ApiSession(WebSocket socket, RequestRouter router)
     {
@@ -37,6 +47,21 @@ internal sealed class ApiSession
 
     /// <summary>Queues a message. Returns false once the session is finished.</summary>
     public bool Send(Message message) => outbound.Writer.TryWrite(message.Serialize());
+
+    /// <summary>
+    /// Asks for a clean shutdown: the write loop drains what is queued, sends a close frame
+    /// and stops, and the read loop unwinds on the client's reply. Waiting on
+    /// <see cref="Completion"/> afterwards is what makes a deliberate stop look deliberate --
+    /// cancelling instead leaves the client with a 1006 abnormal closure.
+    ///
+    /// The frame goes through the write loop rather than straight to the socket because
+    /// a send may be in flight, and two concurrent sends on one WebSocket are not allowed.
+    /// </summary>
+    public void RequestClose()
+    {
+        closeRequested = true;
+        outbound.Writer.TryComplete();
+    }
 
     public async Task RunAsync(CancellationToken outerToken)
     {
@@ -59,6 +84,8 @@ internal sealed class ApiSession
             {
                 // Expected on shutdown.
             }
+
+            finished.TrySetResult();
         }
     }
 
@@ -134,6 +161,22 @@ internal sealed class ApiSession
 
             var bytes = Encoding.UTF8.GetBytes(text);
             await socket.SendAsync(bytes, WebSocketMessageType.Text, true, token).ConfigureAwait(false);
+        }
+
+        // Reached the end of the queue after RequestClose rather than by cancellation.
+        // CloseOutputAsync and not CloseAsync: the read loop owns the receive side and is
+        // sitting in ReceiveAsync right now, where it will see the client's close reply.
+        if (closeRequested && socket.State == WebSocketState.Open)
+        {
+            try
+            {
+                await socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "server stopping", token)
+                    .ConfigureAwait(false);
+            }
+            catch (WebSocketException)
+            {
+                // Client vanished first. The read loop will end on its own.
+            }
         }
     }
 

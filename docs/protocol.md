@@ -32,6 +32,12 @@ in `/ttd`, which closes the port.
 
 At most 8 concurrent sessions; further connections get `503`.
 
+Closing the port deliberately — unticking that box, changing the port, unloading
+the plugin — sends each session a `1000` normal closure and gives it a moment to
+answer before the socket goes. A `1006` therefore means the game actually went
+away. Clients should reconnect on both; the codes are worth telling apart only
+for what they log.
+
 ### What an ungated client can learn and do
 
 Worth stating plainly, since there is no auth to hide behind:

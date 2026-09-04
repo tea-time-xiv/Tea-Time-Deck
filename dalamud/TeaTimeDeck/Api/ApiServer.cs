@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Net;
 using System.Text.Json;
 using System.Threading;
@@ -24,6 +25,12 @@ namespace TeaTimeDeck.Api;
 internal sealed class ApiServer : IDisposable
 {
     private const int MaxSessions = 8;
+
+    /// <summary>
+    /// How long a stop waits for a client to answer the close frame. Generous for a loopback
+    /// round trip and short enough that a wedged client cannot hold the port past a restart.
+    /// </summary>
+    private static readonly TimeSpan DrainTimeout = TimeSpan.FromSeconds(2);
 
     private readonly Configuration config;
     private readonly RequestRouter router;
@@ -81,9 +88,19 @@ internal sealed class ApiServer : IDisposable
         }
     }
 
+    /// <summary>
+    /// Closes the port. Callers are on the framework thread -- the config window and plugin
+    /// teardown -- so the handshake with the connected clients is handed off rather than
+    /// waited on here.
+    /// </summary>
     public void Stop()
     {
-        cts?.Cancel();
+        var stopping = cts;
+        var loop = acceptLoop;
+        var closing = sessions.Values.ToArray();
+
+        cts = null;
+        acceptLoop = null;
 
         try
         {
@@ -96,12 +113,46 @@ internal sealed class ApiServer : IDisposable
         }
 
         listener = null;
-        sessions.Clear();
 
-        cts?.Dispose();
-        cts = null;
-        acceptLoop = null;
+        // Sessions are not dropped from the map here: they remove themselves as they finish,
+        // and clearing early would report SessionCount 0 while they were still draining --
+        // which is the condition StatusService and CatalogWatcher both skip their work on.
+        _ = ShutDownAsync(stopping, loop, closing);
     }
+
+    /// <summary>
+    /// Unwinds a stopped server in the order the WebSocket state machine wants: close frames
+    /// first, cancellation only for what did not answer.
+    /// </summary>
+    private async Task ShutDownAsync(CancellationTokenSource? stopping, Task? loop, ApiSession[] closing)
+    {
+        try
+        {
+            foreach (var session in closing)
+                session.RequestClose();
+
+            if (closing.Length > 0)
+                await WithTimeout(Task.WhenAll(closing.Select(s => s.Completion))).ConfigureAwait(false);
+
+            // Only now: cancelling first aborts the handshake mid-frame, and a client that
+            // reads 1006 treats a deliberate port change as the game having gone away.
+            stopping?.Cancel();
+
+            if (loop is not null)
+                await WithTimeout(loop).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Debug(ex, "Ignoring error while draining sessions.");
+        }
+
+        // The token source is deliberately not disposed. Anything still blocked in
+        // ReceiveAsync holds its token, and disposing under it turns a clean
+        // OperationCanceledException into an ObjectDisposedException. It owns no timer,
+        // and Start() replaces it, so letting it become garbage is enough.
+    }
+
+    private static Task WithTimeout(Task task) => Task.WhenAny(task, Task.Delay(DrainTimeout));
 
     public void Restart()
     {

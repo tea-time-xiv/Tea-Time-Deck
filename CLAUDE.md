@@ -236,6 +236,16 @@ reconnects with 1 s→30 s backoff; requests fail cleanly while down and keys re
 inspector's **Port** field is an override stored in global settings;
 `TEATIMEDECK_CONFIG` pins one exact file.
 
+`ApiServer.Stop` is the other half of that: it sends each session a `1000` close
+frame through that session's own write loop (a frame written from the stopping
+thread would race an in-flight `SendAsync`), waits up to 2 s for the replies, and
+only then cancels. So `1006` means the game went away and `1000` means the user
+did something. The cancellation token source is **not** disposed — sessions may
+still hold the token, and disposing under them turns their cancellation into an
+`ObjectDisposedException` — and sessions are left to remove themselves from the
+map, because clearing it early makes `SessionCount` read 0 while they drain,
+which is the condition `StatusService` and `CatalogWatcher` skip work on.
+
 ## Conventions
 
 - **No internet at runtime.** The property inspector is hand-written rather than
