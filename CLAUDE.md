@@ -40,6 +40,7 @@ cd streamdeck
 npm install
 npm run build          # rollup + tsc -> xiv.teatime.deck.sdPlugin/bin/plugin.js
 npm run watch
+npm test               # vitest, headless: no game, no deck, no socket
 npm run package        # ../dist/xiv.teatime.deck.streamDeckPlugin installer
 ..\tools\Install-StreamDeckPlugin.ps1 -Restart    # junction for dev; -Uninstall to remove
 ```
@@ -48,8 +49,15 @@ There is no separate lint or typecheck step — `npm run build` type-checks via
 `@rollup/plugin-typescript`. The Stream Deck app loads plugins **only at
 startup**, so restart it after every rebuild (`-Restart` does it).
 
-There is no unit test suite. The game half is exercised against a running client
-with the scripts in `tools/`, which are the test harness:
+Unit tests cover the deck half only, in `streamdeck/test/`: the parts that need
+neither game nor deck — port discovery against a temp tree, the client's request
+correlation and cache invalidation against a fake socket, and the pure helpers in
+`browser-util.ts`. They live outside `src/` so the build's type-check never sees
+them. CI runs them on every push and PR.
+
+The game half has no unit tests: its services are static `[PluginService]`
+properties on `Plugin`, so it is exercised against a running client with the
+scripts in `tools/`, which are the test harness:
 
 ```powershell
 .\tools\Test-Api.ps1                            # health + hello + ping
@@ -171,6 +179,12 @@ browser state per-page and restart-durable. The slot registry stays per *device*
 (a 15-key and a 32-key deck cannot share a page number). Teardown order between
 pages is not guaranteed — `removeNav` only drops ownership if the leaving key
 still holds it.
+
+`browser-util.ts` holds the three answers that are decisions rather than side
+effects — `wrapTitle`, `allowedFrom`, `sameKinds`. They live apart because
+`browser.ts` reaches the SDK on import, and these are worth checking without a
+deck attached. `BrowserKindSettings` went with them and is re-exported from
+`browser.ts`, which is still where the rest of the code asks for it.
 
 ### Security posture — read before touching the API surface
 

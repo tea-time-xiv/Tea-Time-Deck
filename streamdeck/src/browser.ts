@@ -1,5 +1,6 @@
 import streamDeck, { type KeyAction } from "@elgato/streamdeck";
 
+import { allowedFrom, sameKinds, wrapTitle, type BrowserKindSettings } from "./browser-util.js";
 import { renderBrowserKind, renderMessage, toDataUri } from "./status-render.js";
 import { xiv, type CatalogEntry, type CatalogKind } from "./xiv-client.js";
 
@@ -9,13 +10,8 @@ import { xiv, type CatalogEntry, type CatalogKind } from "./xiv-client.js";
  */
 export type NavRole = "page" | "kind";
 
-/** Stored on the Switch Type key, which is what makes browser state per Stream Deck page. */
-export type BrowserKindSettings = {
-	kind?: string;
-	page?: number;
-	/** Types this key cycles through. Absent or empty means all of them. */
-	kinds?: string[];
-};
+/** Re-exported from browser-util.js: it is still this module's vocabulary. */
+export type { BrowserKindSettings };
 
 /**
  * A page of catalog entries spread across whatever browser slots are on a device.
@@ -379,34 +375,6 @@ export async function repaintAllBrowsers(): Promise<void> {
 
 		await browser.repaint();
 	}
-}
-
-/** Stream Deck renders titles on one line unless told otherwise; long names need help. */
-function wrapTitle(name: string): string {
-	if (name.length <= 9) {
-		return name;
-	}
-
-	const words = name.split(" ");
-	if (words.length === 1) {
-		return name;
-	}
-
-	const half = Math.ceil(words.length / 2);
-	return `${words.slice(0, half).join(" ")}\n${words.slice(half).join(" ")}`;
-}
-
-/** An empty allow-list means the same as no allow-list: cycle everything. */
-function allowedFrom(settings: BrowserKindSettings): string[] | undefined {
-	return settings.kinds !== undefined && settings.kinds.length > 0 ? settings.kinds : undefined;
-}
-
-function sameKinds(a: string[] | undefined, b: string[] | undefined): boolean {
-	if (a === undefined || b === undefined) {
-		return a === b;
-	}
-
-	return a.length === b.length && a.every((kind, index) => kind === b[index]);
 }
 
 function capitalise(kind: string): string {

@@ -78,6 +78,12 @@ jobs:
         npm ci
         npm run build
 
+    - name: Test Stream Deck plugin
+      working-directory: streamdeck
+      # Needs no game, no deck and no network, so it gates every push and PR.
+      # The game half's suite is the scripts in tools/, which need a live client.
+      run: npm test
+
     - name: Package Stream Deck plugin
       working-directory: streamdeck
       shell: pwsh
