@@ -140,6 +140,13 @@ invalidation landing in that window swallows the scoped ones. The event's
 `kinds` payload is optional: a client that ignores it refetches everything and
 is still correct.
 
+`Invalidate` bumps a generation counter, and `GetAsync` stores its result only if
+that counter has not moved across the framework hop. A build that was already in
+flight would otherwise write its pre-unlock list back into the cache the
+invalidation had just cleared — and the notice arriving two seconds later would
+serve exactly that. The request still gets the list it built; only the caching of
+it is dropped.
+
 ### Status pipeline
 
 `StatusService` samples on `Framework.Update` at 250 ms, serialises, and pushes

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Lumina.Excel;
 
@@ -32,6 +33,12 @@ internal sealed class CatalogRegistry : IDisposable
     private bool pendingEveryKind;
     private bool noticeScheduled;
     private bool disposed;
+
+    /// <summary>
+    /// Bumped by every invalidation. A build dispatched before the bump must not write its
+    /// result back afterwards -- see <see cref="GetAsync"/>.
+    /// </summary>
+    private int generation;
 
     /// <summary>
     /// Raised when cached entries were dropped and clients should refetch. Carries the
@@ -80,9 +87,17 @@ internal sealed class CatalogRegistry : IDisposable
         if (cache.TryGetValue(provider.Kind, out var cached))
             return cached;
 
+        var generationAtDispatch = Volatile.Read(ref generation);
+
         // Sheet and unlock reads are framework-thread only.
         var built = await Plugin.Framework.RunOnFrameworkThread(provider.Build).ConfigureAwait(false);
-        cache[provider.Kind] = built;
+
+        // An unlock landing while the build was on the framework thread has already cleared
+        // the cache; storing now would put the pre-unlock list back into it, and the notice
+        // that follows would serve exactly that stale list to the client it just woke up.
+        // The request still gets what it built -- only the caching of it is dropped.
+        if (Volatile.Read(ref generation) == generationAtDispatch)
+            cache[provider.Kind] = built;
 
         Plugin.Log.Debug("Built {Kind} catalog: {Count} entries.", provider.Kind, built.Count);
         return built;
@@ -97,6 +112,11 @@ internal sealed class CatalogRegistry : IDisposable
     /// </summary>
     public void Invalidate(params string[] kinds)
     {
+        // Before the removals, so a build already in flight sees the move whichever branch
+        // this takes. Bumping for a scoped invalidation costs an unrelated kind one
+        // uncached rebuild; a per-kind counter would buy that back and little else.
+        Interlocked.Increment(ref generation);
+
         if (kinds.Length == 0)
         {
             // Notify even when nothing was cached here: clients keep their own copies, and an
