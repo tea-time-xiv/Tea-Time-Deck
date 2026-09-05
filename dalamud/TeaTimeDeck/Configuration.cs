@@ -51,6 +51,14 @@ public class Configuration : IPluginConfiguration
     /// </summary>
     public GlamourerApplyMode GlamourerApply { get; set; } = GlamourerApplyMode.Everything;
 
+    /// <summary>
+    /// Whether the "there is a second half to install" line has been said. No version bump:
+    /// a config written before this existed loads as false, so an existing user is told
+    /// once as well -- and if their deck is already connected when the notice comes due,
+    /// it is marked said and never printed.
+    /// </summary>
+    public bool DeckDownloadNoticeShown { get; set; }
+
     public static Configuration Load()
     {
         var config = Plugin.PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();

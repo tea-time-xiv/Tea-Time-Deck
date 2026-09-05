@@ -277,6 +277,13 @@ which is the condition `StatusService` and `CatalogWatcher` skip work on.
   on loopback.
 - Comments here explain *why* a thing is shaped the way it is, not what the code
   does. Match that — the existing density is intentional.
+- **The other half has to be findable.** This plugin loads, listens and looks
+  entirely healthy whether or not the Stream Deck plugin exists, so nothing about
+  a blank deck tells the user there is a second download. Three places say so:
+  the block at the top of `README.md` (where the Dalamud installer's repository
+  link lands), the first section of `/ttd`, and a one-time chat notice
+  (`FirstRunNotice`) that is marked said and never printed when a deck is already
+  connected. `Plugin.StreamDeckDownloadUrl` is the only copy of the URL.
 - Settings that must survive a language change are stored as row ids, not names
   (see `Configuration.HiddenEmoteCategories`). Bump `Configuration.Version` and
   migrate in `Load()` when the shape changes.

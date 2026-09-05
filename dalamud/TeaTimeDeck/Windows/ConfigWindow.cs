@@ -13,8 +13,6 @@ public sealed class ConfigWindow : Window, IDisposable
     private static readonly Vector4 Green = new(0.4f, 0.85f, 0.4f, 1f);
     private static readonly Vector4 Red = new(0.9f, 0.4f, 0.4f, 1f);
 
-    private const string StreamDeckReleaseUrl = "https://github.com/tea-time-xiv/Tea-Time-Deck/releases/latest";
-
     private readonly Plugin plugin;
     private readonly Configuration config;
 
@@ -36,6 +34,9 @@ public sealed class ConfigWindow : Window, IDisposable
 
     public override void Draw()
     {
+        DrawStreamDeckHalf();
+
+        ImGui.Spacing();
         ImGui.TextUnformatted("Local API");
         ImGui.Separator();
 
@@ -63,12 +64,6 @@ public sealed class ConfigWindow : Window, IDisposable
             ImGui.TextDisabled("Not listening.");
         }
 
-        // The most useful moment to offer this is exactly when nothing has ever
-        // connected: that's a user who has this plugin but not the other half yet.
-        if (server.SessionCount == 0 && ImGui.Button("Get the Stream Deck plugin"))
-        {
-            Util.OpenLink(StreamDeckReleaseUrl);
-        }
 
         ImGui.SetNextItemWidth(120);
         if (ImGui.InputInt("Port", ref portInput))
@@ -98,6 +93,36 @@ public sealed class ConfigWindow : Window, IDisposable
 
         ImGui.Spacing();
         DrawEmoteCategories();
+    }
+
+    /// <summary>
+    /// The download, first and unconditionally.
+    ///
+    /// This half is only half: without the Stream Deck plugin nothing appears on a deck,
+    /// and there is no symptom to search for -- the game plugin behaves perfectly. It sits
+    /// at the top of the window rather than behind a "nobody has connected yet" test,
+    /// because the same button is what a user reaches for after a deck rebuild or on a
+    /// second PC, when something has certainly connected before.
+    /// </summary>
+    private void DrawStreamDeckHalf()
+    {
+        ImGui.TextUnformatted("Stream Deck plugin");
+        ImGui.Separator();
+
+        ImGui.TextWrapped("Tea Time Deck is two plugins. This one is the game half; the deck half " +
+                          "is a separate download that the Stream Deck app installs.");
+
+        if (ImGui.Button("Download the Stream Deck plugin"))
+            Util.OpenLink(Plugin.StreamDeckDownloadUrl);
+
+        ImGui.SameLine();
+        if (ImGui.Button("Copy link"))
+            ImGui.SetClipboardText(Plugin.StreamDeckDownloadUrl);
+
+        // Spelled out as well as linked: a browser opened from a game running full screen
+        // is not always the browser the user is looking at.
+        ImGui.TextDisabled(Plugin.StreamDeckDownloadUrl);
+        ImGui.TextDisabled("Download xiv.teatime.deck.streamDeckPlugin and double-click it.");
     }
 
     /// <summary>
