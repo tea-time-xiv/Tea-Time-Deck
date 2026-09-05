@@ -15,6 +15,11 @@ export type CatalogEntry = {
 	command: string | null;
 	/** Set only by kinds the game does not number -- Glamourer designs are GUIDs. */
 	key?: string | null;
+	/**
+	 * Asks for a key of its own on every page rather than paging away with the rest --
+	 * Glamourer's Reset. Absent from older servers, where nothing was pinned.
+	 */
+	pinned?: boolean;
 };
 
 export type CatalogKind = {

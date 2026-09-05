@@ -1,6 +1,6 @@
 import streamDeck, { type KeyAction } from "@elgato/streamdeck";
 
-import { allowedFrom, sameKinds, wrapTitle, type BrowserKindSettings } from "./browser-util.js";
+import { allowedFrom, layoutPage, sameKinds, wrapTitle, type BrowserKindSettings } from "./browser-util.js";
 import { renderBrowserKind, renderMessage, toDataUri } from "./status-render.js";
 import { xiv, type CatalogEntry, type CatalogKind } from "./xiv-client.js";
 
@@ -131,8 +131,10 @@ class DeviceBrowser {
 			return undefined;
 		}
 
+		// The same layout the paint used, rather than a second sum of it: a pinned entry
+		// holds the first slot on every page, so the slot index is not the list index.
 		const entries = await this.#entries();
-		return entries[this.#page * ordered.length + index];
+		return layoutPage(entries, ordered.length, this.#page).visible[index];
 	}
 
 	public async changePage(delta: number): Promise<void> {
@@ -142,10 +144,10 @@ class DeviceBrowser {
 		}
 
 		const entries = await this.#entries();
-		const pageCount = Math.max(1, Math.ceil(entries.length / pageSize));
+		const { pageCount, page } = layoutPage(entries, pageSize, this.#page);
 
 		// Wrap, so holding one nav key can reach everything without a direction change.
-		this.#page = (((this.#page + delta) % pageCount) + pageCount) % pageCount;
+		this.#page = (((page + delta) % pageCount) + pageCount) % pageCount;
 		await this.repaint();
 		await this.#persist();
 	}
@@ -212,16 +214,10 @@ class DeviceBrowser {
 			failure = error instanceof Error ? error.message : String(error);
 		}
 
-		const pageSize = slots.length;
-		const pageCount = pageSize === 0 ? 1 : Math.max(1, Math.ceil(entries.length / pageSize));
-
-		// Slots can disappear under us, so a page that was valid may no longer be.
-		if (this.#page >= pageCount) {
-			this.#page = pageCount - 1;
-		}
-
-		const start = this.#page * pageSize;
-		const visible = entries.slice(start, start + pageSize);
+		// Clamping lives in the layout: slots can disappear under us, so a page that was
+		// valid may no longer be, and the paint is where that is noticed.
+		const { visible, pageCount, page } = layoutPage(entries, slots.length, this.#page);
+		this.#page = page;
 
 		// One batched fetch beats one request per key before the page can finish drawing.
 		if (visible.length > 0) {

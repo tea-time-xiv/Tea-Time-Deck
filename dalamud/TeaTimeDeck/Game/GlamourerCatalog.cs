@@ -12,6 +12,13 @@ internal sealed class GlamourerCatalog : ICatalogProvider
     /// <summary>Named here so the executor and the watcher agree with the wire.</summary>
     public const string KindName = "glamourer";
 
+    /// <summary>
+    /// The one key of this kind that is not a design. Not a GUID, and it cannot be mistaken
+    /// for one, which is what lets the executor tell the two apart by looking at the key it
+    /// was handed rather than by keeping a second list.
+    /// </summary>
+    public const string ResetKey = "reset";
+
     private readonly GlamourerIpc glamourer;
 
     public GlamourerCatalog(GlamourerIpc glamourer)
@@ -32,12 +39,28 @@ internal sealed class GlamourerCatalog : ICatalogProvider
     public IReadOnlyList<CatalogEntry> Build()
     {
         var designs = glamourer.List();
-        var entries = new List<CatalogEntry>(designs.Count);
+        var entries = new List<CatalogEntry>(designs.Count + 1);
 
-        for (var index = 0; index < designs.Count; index++)
+        // The way back off. Glamourer's list holds designs and only designs, so the one
+        // press a design browser most obviously wants -- undo -- is the one press it can
+        // never list; it is minted here instead. Pinned, because a design applied from
+        // page one is just as likely to be undone from page four.
+        if (glamourer.CanRevert)
         {
-            var design = designs[index];
+            entries.Add(new CatalogEntry(
+                Kind: Kind,
+                Id: 0,
+                Name: "Reset",
+                IconId: 0,
+                Category: null,
+                SortOrder: 0,
+                Command: "/glamour revert | <me>",
+                Key: ResetKey,
+                Pinned: true));
+        }
 
+        foreach (var design in designs)
+        {
             entries.Add(new CatalogEntry(
                 Kind: Kind,
                 // Unused for this kind; Key is what addresses a design.
@@ -49,7 +72,7 @@ internal sealed class GlamourerCatalog : ICatalogProvider
                 Category: FolderOf(design.FullPath),
                 // Already ordered by path, so this keeps the deck's paging matching the
                 // order Glamourer's own list shows.
-                SortOrder: index,
+                SortOrder: entries.Count,
                 // Informational, like every other kind's command, and it follows the apply
                 // setting so it says what a press will actually do. Execution goes over IPC:
                 // it reports success, and it cannot be seen by anyone else.

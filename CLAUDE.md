@@ -103,6 +103,14 @@ because the reported `command` text follows it and a deck that said one thing
 while doing the other would be lying. No `Configuration.Version` bump: an older
 file loads as `Everything`, which is what those versions did.
 
+The `glamourer` catalog also mints one entry the design list can never hold: `Reset`
+(`key` `reset`, `CatalogEntry.Pinned`), which calls `Glamourer.RevertState` instead of
+`ApplyDesign`. It reverts `Equipment|Customization` whatever `GlamourerApply` says —
+that setting is about how much of a design a press reaches, and an undo leaving the
+gear half on is not an undo. `Pinned` is a layout hint the deck honours by giving the
+entry a key on every page (`layoutPage` in `browser-util.ts`), dropped when the browser
+has too few slots to page without it.
+
 A kind whose ids the game does not mint sets `Addressing => CatalogAddressing.Key`
 and fills `CatalogEntry.Key`; `execute` then wants `key` rather than `id`, which
 the router asks the registry about rather than deciding by name. `glamourer` is
@@ -180,8 +188,8 @@ browser state per-page and restart-durable. The slot registry stays per *device*
 pages is not guaranteed — `removeNav` only drops ownership if the leaving key
 still holds it.
 
-`browser-util.ts` holds the three answers that are decisions rather than side
-effects — `wrapTitle`, `allowedFrom`, `sameKinds`. They live apart because
+`browser-util.ts` holds the answers that are decisions rather than side
+effects — `wrapTitle`, `allowedFrom`, `sameKinds`, `layoutPage`. They live apart because
 `browser.ts` reaches the SDK on import, and these are worth checking without a
 deck attached. `BrowserKindSettings` went with them and is re-exported from
 `browser.ts`, which is still where the rest of the code asks for it.
