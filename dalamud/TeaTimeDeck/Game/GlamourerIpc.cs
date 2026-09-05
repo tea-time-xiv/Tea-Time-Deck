@@ -51,6 +51,8 @@ internal sealed class GlamourerIpc
 
     private readonly ICallGateSubscriber<Guid, int, uint, ulong, int> applyDesign;
 
+    private readonly ICallGateSubscriber<int, uint, ulong, int> revertState;
+
     /// <summary>Logged once per Glamourer, so a mismatch shows up in the log rather than as silence.</summary>
     private bool versionLogged;
 
@@ -63,6 +65,8 @@ internal sealed class GlamourerIpc
             .GetIpcSubscriber<Dictionary<Guid, (string, string, uint, bool)>>("Glamourer.GetDesignListExtended");
         applyDesign = Plugin.PluginInterface
             .GetIpcSubscriber<Guid, int, uint, ulong, int>("Glamourer.ApplyDesign");
+        revertState = Plugin.PluginInterface
+            .GetIpcSubscriber<int, uint, ulong, int>("Glamourer.RevertState");
     }
 
     /// <summary>
@@ -87,6 +91,13 @@ internal sealed class GlamourerIpc
     /// waiting for a restart.
     /// </summary>
     public bool Available => designList.HasFunction && applyDesign.HasFunction;
+
+    /// <summary>
+    /// Whether reverting is on offer as well. Checked apart from <see cref="Available"/> on
+    /// purpose: a Glamourer that grew or lost this one gate should cost the catalog its
+    /// Reset entry, not every design in it.
+    /// </summary>
+    public bool CanRevert => revertState.HasFunction;
 
     /// <summary>
     /// Every design, ordered by the path Glamourer files it under so the deck matches the
@@ -133,6 +144,22 @@ internal sealed class GlamourerIpc
             throw new InvalidOperationException("Glamourer is not installed or not loaded");
 
         return applyDesign.InvokeFunc(design, LocalPlayerIndex, NoLockKey, ApplyFlags);
+    }
+
+    /// <summary>
+    /// Puts the character back the way the game has it, undoing whatever design was applied.
+    /// The same thing Glamourer's own revert does, and it answers with the same result codes.
+    ///
+    /// Deliberately not filtered by <see cref="ApplyFlags"/>: reverting appearance while
+    /// leaving a design's gear on is not a reset of anything, and the setting is about what
+    /// a design press should reach, not about what should survive one being undone.
+    /// </summary>
+    public int Revert()
+    {
+        if (!CanRevert)
+            throw new InvalidOperationException("Glamourer is not installed or not loaded");
+
+        return revertState.InvokeFunc(LocalPlayerIndex, NoLockKey, EquipmentFlag | CustomizationFlag);
     }
 
     /// <summary>Glamourer's own words for a result code, for the ones worth reporting.</summary>

@@ -156,8 +156,12 @@ Returns everything the player owns of that kind, in the game's own display order
 ```json
 {
   "kind": "glamourer",
-  "count": 30,
+  "count": 31,
   "entries": [
+    { "kind": "glamourer", "id": 0, "name": "Reset", "iconId": 0,
+      "category": null, "sortOrder": 0,
+      "command": "/glamour revert | <me>",
+      "key": "reset", "pinned": true },
     { "kind": "glamourer", "id": 0, "name": "Elezen F", "iconId": 0,
       "category": "Casual", "sortOrder": 3,
       "command": "/glamour apply \"Elezen F\" | <me>",
@@ -175,6 +179,19 @@ execute text commands, designs included.
 `key` is present only on kinds whose `addressing` is `key`, where `id` is always
 `0` and carries no meaning. Clients that save an entry against a deck key must
 save the `key`, not a position: designs are added and deleted freely.
+
+`pinned` is present only when true, and asks a browser to give that entry a key
+of its own on every page instead of letting it page away. It is a hint about
+layout, not about behaviour: a client that ignores it shows the entry first,
+which is where it already sorts. Only leading entries are ever pinned, and a
+browser too small to spare the slot should ignore the request rather than lose
+its ability to page.
+
+`glamourer` is the only kind with one so far — `key` `reset`, which is not a
+GUID and never collides with one. It is Glamourer's own revert rather than a
+design: the list can hold every look a character can put on, but not the way
+back off, so the server mints that entry itself. It appears whenever Glamourer
+answers the `Glamourer.RevertState` gate, and disappears with Glamourer.
 
 Results are cached and rebuilt when the player unlocks something. Three kinds sit
 outside that: `gearset` is edited rather than unlocked, so it is polled once a
@@ -238,6 +255,19 @@ player — with the flags chosen in `/ttd`, either `Equipment | Customization`
 will do. What the design actually changes stays the design's own business. The 100 ms floor is
 shared with the hotbar path rather than counted separately, so alternating
 between them buys nothing.
+
+```json
+{ "kind": "glamourer", "key": "reset" }
+```
+
+The `reset` key calls `Glamourer.RevertState` against the same object index,
+putting the character back to what it is actually wearing. It always sends
+`Equipment | Customization`, whatever the apply setting says: that setting is
+about how much of a design a press should reach, and an undo that left the gear
+half of one on would not be an undo. Reverting a character with nothing on is a
+success, not an error — Glamourer answers `result` `0` for it (measured against
+1.6.1.7) and `1`, nothing done, is treated the same way. It claims the same
+100 ms gate a design press does.
 
 Entries are looked up in the catalog rather than passed through, so a client
 cannot execute anything the player does not have. For actions that means the

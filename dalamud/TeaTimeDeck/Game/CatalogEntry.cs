@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace TeaTimeDeck.Game;
 
 /// <summary>
@@ -15,6 +17,12 @@ namespace TeaTimeDeck.Game;
 /// Identifier for kinds the game does not number, currently Glamourer's design GUIDs.
 /// Null for everything that has an Excel row id, which is what <see cref="Id"/> is for.
 /// </param>
+/// <param name="Pinned">
+/// Asks a browser to keep this entry on a key of its own rather than letting it page away
+/// with the rest -- currently only Glamourer's Reset, which is worth reaching from page
+/// four as much as from page one. A hint: a client that ignores it simply shows the entry
+/// first, which is where it already sorts.
+/// </param>
 public sealed record CatalogEntry(
     string Kind,
     uint Id,
@@ -23,4 +31,8 @@ public sealed record CatalogEntry(
     string? Category,
     int SortOrder,
     string? Command,
-    string? Key = null);
+    string? Key = null,
+    // Left off the wire when false, which is every entry but one: a hundred emotes each
+    // carrying "pinned": false would be a hundred lines saying nothing.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    bool Pinned = false);

@@ -2,6 +2,19 @@
 
 Drive Final Fantasy XIV from an Elgato Stream Deck.
 
+> **Download**
+>
+> **Game half** — add
+> `https://raw.githubusercontent.com/tea-time-xiv/pluginmaster/master/pluginmaster.json`
+> to `/xlsettings` → Experimental, then install **Tea Time Deck** from `/xlplugins`.
+>
+> **Deck half** — grab `xiv.teatime.deck.streamDeckPlugin` from the
+> [latest release](https://github.com/tea-time-xiv/Tea-Time-Deck/releases/latest)
+> and double-click it.
+>
+> You need both, and the deck half is the one nobody expects: the game plugin
+> works perfectly on its own and your deck stays blank. [More below](#installing).
+
 Two halves that talk over a localhost WebSocket:
 
 ```
@@ -68,7 +81,7 @@ unlocked:
 | Minions | Done |
 | Gear sets | Done — the browser follows renames and reordering on its own |
 | Actions | Done — the current job's, plus its role actions, repopulating when you switch |
-| Glamourer designs | Done — when Glamourer is loaded; applied over its own API, never as a chat command. `/ttd` chooses whether a press applies everything or appearance only |
+| Glamourer designs | Done — when Glamourer is loaded; applied over its own API, never as a chat command. `/ttd` chooses whether a press applies everything or appearance only, and a pinned **Reset** key takes the design back off from any page |
 | Fashion accessories, macros, teleports, glamour plates | Planned |
 
 Read-only status keys, drawn as SVG in the game's own visual style:
@@ -112,7 +125,9 @@ Then `/xlplugins` → search **Tea Time Deck** → Install. Updates arrive throu
 Dalamud from then on.
 
 **Deck half.** Download `xiv.teatime.deck.streamDeckPlugin` and double-click it.
-The Stream Deck app installs it, and later releases update over the top.
+The Stream Deck app installs it, and later releases update over the top. This
+one does not arrive through Dalamud and is not updated by it — `/ttd` in game
+has a button that opens the release page when it is time to fetch a new one.
 
 Nothing to configure after that: there is no key to pair, and the Stream Deck
 plugin finds the port by reading the game plugin's own config file. Drag a key

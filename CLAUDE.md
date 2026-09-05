@@ -103,6 +103,14 @@ because the reported `command` text follows it and a deck that said one thing
 while doing the other would be lying. No `Configuration.Version` bump: an older
 file loads as `Everything`, which is what those versions did.
 
+The `glamourer` catalog also mints one entry the design list can never hold: `Reset`
+(`key` `reset`, `CatalogEntry.Pinned`), which calls `Glamourer.RevertState` instead of
+`ApplyDesign`. It reverts `Equipment|Customization` whatever `GlamourerApply` says —
+that setting is about how much of a design a press reaches, and an undo leaving the
+gear half on is not an undo. `Pinned` is a layout hint the deck honours by giving the
+entry a key on every page (`layoutPage` in `browser-util.ts`), dropped when the browser
+has too few slots to page without it.
+
 A kind whose ids the game does not mint sets `Addressing => CatalogAddressing.Key`
 and fills `CatalogEntry.Key`; `execute` then wants `key` rather than `id`, which
 the router asks the registry about rather than deciding by name. `glamourer` is
@@ -180,8 +188,8 @@ browser state per-page and restart-durable. The slot registry stays per *device*
 pages is not guaranteed — `removeNav` only drops ownership if the leaving key
 still holds it.
 
-`browser-util.ts` holds the three answers that are decisions rather than side
-effects — `wrapTitle`, `allowedFrom`, `sameKinds`. They live apart because
+`browser-util.ts` holds the answers that are decisions rather than side
+effects — `wrapTitle`, `allowedFrom`, `sameKinds`, `layoutPage`. They live apart because
 `browser.ts` reaches the SDK on import, and these are worth checking without a
 deck attached. `BrowserKindSettings` went with them and is re-exported from
 `browser.ts`, which is still where the rest of the code asks for it.
@@ -269,6 +277,13 @@ which is the condition `StatusService` and `CatalogWatcher` skip work on.
   on loopback.
 - Comments here explain *why* a thing is shaped the way it is, not what the code
   does. Match that — the existing density is intentional.
+- **The other half has to be findable.** This plugin loads, listens and looks
+  entirely healthy whether or not the Stream Deck plugin exists, so nothing about
+  a blank deck tells the user there is a second download. Three places say so:
+  the block at the top of `README.md` (where the Dalamud installer's repository
+  link lands), the first section of `/ttd`, and a one-time chat notice
+  (`FirstRunNotice`) that is marked said and never printed when a deck is already
+  connected. `Plugin.StreamDeckDownloadUrl` is the only copy of the URL.
 - Settings that must survive a language change are stored as row ids, not names
   (see `Configuration.HiddenEmoteCategories`). Bump `Configuration.Version` and
   migrate in `Load()` when the shape changes.

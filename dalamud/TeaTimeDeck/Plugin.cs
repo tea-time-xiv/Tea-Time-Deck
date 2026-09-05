@@ -14,6 +14,14 @@ public sealed class Plugin : IDalamudPlugin
 {
     private const string CommandName = "/ttd";
 
+    /// <summary>
+    /// Where the other half comes from. Both halves are attached to every release, and the
+    /// Stream Deck one is the download nobody thinks to look for: this plugin works and
+    /// says nothing, while the deck stays blank. Held here because the config window and
+    /// the first-run notice both point at it, and they must not drift apart.
+    /// </summary>
+    internal const string StreamDeckDownloadUrl = "https://github.com/tea-time-xiv/Tea-Time-Deck/releases/latest";
+
     [PluginService] internal static IDalamudPluginInterface PluginInterface { get; private set; } = null!;
     [PluginService] internal static ICommandManager CommandManager { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
@@ -42,6 +50,7 @@ public sealed class Plugin : IDalamudPlugin
     internal CatalogWatcher Watcher { get; }
 
     private ConfigWindow ConfigWindow { get; }
+    private FirstRunNotice Notice { get; }
 
     public Plugin()
     {
@@ -79,6 +88,10 @@ public sealed class Plugin : IDalamudPlugin
         ConfigWindow = new ConfigWindow(this);
         WindowSystem.AddWindow(ConfigWindow);
 
+        // After the server, because it asks whether anything has connected before deciding
+        // the user needs telling where the other half lives.
+        Notice = new FirstRunNotice(Configuration, ApiServer);
+
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
             HelpMessage = "Open the Tea Time Deck settings window.",
@@ -102,6 +115,7 @@ public sealed class Plugin : IDalamudPlugin
 
         Catalogs.Invalidated -= OnCatalogsInvalidated;
 
+        Notice.Dispose();
         Watcher.Dispose();
         Status.Dispose();
         ApiServer.Dispose();
