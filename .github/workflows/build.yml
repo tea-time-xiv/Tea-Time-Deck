@@ -9,8 +9,10 @@ on:
     branches: [ main ]
     tags: [ 'v*' ]
 
+# Read-only by default: a pull request build has no business writing to the repo.
+# Only the release job, which runs for tags alone, is granted write.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
 
@@ -19,7 +21,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v5
+      uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
     - name: Read version from csproj
       shell: pwsh
@@ -44,7 +46,7 @@ jobs:
         Write-Host "Tag and csproj agree on $env:VERSION."
 
     - name: Install .NET
-      uses: actions/setup-dotnet@v5
+      uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
       with:
         dotnet-version: 10.0.x
 
@@ -66,7 +68,7 @@ jobs:
                   "$env:GITHUB_WORKSPACE\TeaTimeDeck.zip"
 
     - name: Install Node
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
       with:
         node-version: 20
         cache: npm
@@ -104,7 +106,7 @@ jobs:
             --force
 
     - name: Store artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
         name: TeaTimeDeck
         path: |
@@ -113,10 +115,43 @@ jobs:
         if-no-files-found: error
         retention-days: 7
 
-    - name: Release
+    - name: Check changelog section exists
       if: startsWith(github.ref, 'refs/tags/v')
-      uses: ncipollo/release-action@v1
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = "Stop"
+
+        # This section is what the in-game changelog shows, via the plugin repo generator.
+        # A release without one would ship "- <version>" and tell players nothing.
+        $changelog = Get-Content "CHANGELOG.md" -Raw
+        $pattern = "(?ms)^##\s+\[?" + [regex]::Escape($env:VERSION) + "\]?(?![\d.])[^\r\n]*\r?\n(.*?)(?=^##\s|\z)"
+        $match = [regex]::Match($changelog, $pattern)
+        if (-not $match.Success -or -not $match.Groups[1].Value.Trim()) {
+            throw "CHANGELOG.md has no section for $env:VERSION. Add one before releasing."
+        }
+        Write-Host "Changelog section for ${env:VERSION}:`n$($match.Groups[1].Value.Trim())"
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    # The only job in this repo that may write, and it cannot run for a pull request.
+    permissions:
+      contents: write
+
+    steps:
+    - name: Download build output
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
       with:
+        name: TeaTimeDeck
+
+    - name: Release
+      uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd # v1.21.0
+      with:
+        # The release job does not check the repo out, so the action needs to be told
+        # which commit to hang the new tag on.
+        commit: ${{ github.sha }}
         artifacts: "TeaTimeDeck.zip,xiv.teatime.deck.streamDeckPlugin"
         tag: ${{ github.ref_name }}
         name: Tea Time Deck ${{ github.ref_name }}
@@ -131,62 +166,7 @@ jobs:
           | `xiv.teatime.deck.streamDeckPlugin` | The Stream Deck plugin. Double-click it — the Stream Deck app installs or updates it for you. |
           | `TeaTimeDeck.zip` | The Dalamud plugin. You do not need to touch this: add the Tea Time repository in `/xlsettings` and install from `/xlplugins`. It is attached because that repository serves this file. |
 
-    - name: Update pluginmaster
-      if: startsWith(github.ref, 'refs/tags/v')
-      shell: pwsh
-      env:
-        PLUGINMASTER_TOKEN: ${{ secrets.PLUGINMASTER_TOKEN }}
-      run: |
-        $ErrorActionPreference = "Stop"
-
-        git clone https://x-access-token:$env:PLUGINMASTER_TOKEN@github.com/tea-time-xiv/pluginmaster.git pluginmaster-repo
-
-        # The plugin manifest is the single source of truth for the listing text, so a
-        # description edit lands in the repo without also editing this workflow.
-        $manifest = Get-Content "dalamud/TeaTimeDeck/TeaTimeDeck.json" -Raw | ConvertFrom-Json
-        $version = $env:VERSION
-        $downloadUrl = "https://github.com/tea-time-xiv/Tea-Time-Deck/releases/download/${{ github.ref_name }}/TeaTimeDeck.zip"
-
-        $entry = [ordered]@{
-            Author              = $manifest.Author
-            Name                = $manifest.Name
-            Punchline           = $manifest.Punchline
-            Description         = $manifest.Description
-            Changelog           = "- $version"
-            IsHide              = $false
-            InternalName        = "TeaTimeDeck"
-            AssemblyVersion     = $version
-            IsTestingExclusive  = $false
-            ApplicableVersion   = "any"
-            DalamudApiLevel     = 15
-            DownloadCount       = 0
-            LastUpdate          = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-            DownloadLinkInstall = $downloadUrl
-            DownloadLinkUpdate  = $downloadUrl
-            RepoUrl             = $manifest.RepoUrl
-            Tags                = $manifest.Tags
-            CategoryTags        = $manifest.CategoryTags
-        }
-
-        $existing = Get-Content "pluginmaster-repo/pluginmaster.json" -Raw | ConvertFrom-Json
-        $filtered = @($existing | Where-Object { $_.InternalName -ne "TeaTimeDeck" })
-        $merged = $filtered + @($entry)
-
-        # -InputObject, not the pipeline: a one-entry pluginmaster would otherwise
-        # serialise as a bare object and Dalamud expects an array.
-        $json = ConvertTo-Json -InputObject @($merged) -Depth 10
-        Set-Content "pluginmaster-repo/pluginmaster.json" $json -Encoding utf8NoBOM
-
-        Push-Location pluginmaster-repo
-        git symbolic-ref HEAD refs/heads/master
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-        git add pluginmaster.json
-
-        if (git diff --cached --quiet) {
-            Write-Host "pluginmaster.json already up to date; nothing to push."
-        } else {
-            git commit -m "Tea Time Deck $version"
-            git push -u origin master
-        }
-        Pop-Location
+    # The Tea Time plugin repo builds pluginmaster.json itself, from this repo's latest
+    # release and the manifest inside its zip. It holds no credential for this repo and
+    # this repo holds none for it: its schedule picks the release up within 15 minutes,
+    # or run its "Publish pluginmaster" workflow by hand to publish at once.
