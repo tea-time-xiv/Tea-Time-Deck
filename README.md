@@ -152,6 +152,17 @@ That junctions the plugin folder into the Stream Deck app rather than packing
 it, so a rebuild needs no reinstall. `npm run package` in `streamdeck/` builds
 the `.streamDeckPlugin` installer instead.
 
+## Releasing
+
+1. Bump `<Version>` in the csproj and add the matching `## <version>` section to
+   `CHANGELOG.md`. CI fails the build without one — that section becomes both the GitHub
+   release notes and the in-game changelog.
+2. Merge to `main`, then push a `v<version>` tag. CI builds, checks the tag against the csproj version and publishes the GitHub release.
+3. The Tea Time plugin repo picks the release up within 15 minutes. To publish at once, run
+   its *Publish pluginmaster* workflow: `gh workflow run publish.yml -R tea-time-xiv/pluginmaster`,
+   or the **Run workflow** button on that repo's Actions tab. This repo holds no credential
+   for it.
+
 ## Status
 
 Working end to end: emote, mount and minion browsers with real game icons,
