@@ -2,6 +2,7 @@ using System;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
+using Dalamud.Utility;
 using Lumina.Excel.Sheets;
 using TeaTimeDeck.Game;
 
@@ -11,6 +12,8 @@ public sealed class ConfigWindow : Window, IDisposable
 {
     private static readonly Vector4 Green = new(0.4f, 0.85f, 0.4f, 1f);
     private static readonly Vector4 Red = new(0.9f, 0.4f, 0.4f, 1f);
+
+    private const string StreamDeckReleaseUrl = "https://github.com/tea-time-xiv/Tea-Time-Deck/releases/latest";
 
     private readonly Plugin plugin;
     private readonly Configuration config;
@@ -58,6 +61,13 @@ public sealed class ConfigWindow : Window, IDisposable
         else
         {
             ImGui.TextDisabled("Not listening.");
+        }
+
+        // The most useful moment to offer this is exactly when nothing has ever
+        // connected: that's a user who has this plugin but not the other half yet.
+        if (server.SessionCount == 0 && ImGui.Button("Get the Stream Deck plugin"))
+        {
+            Util.OpenLink(StreamDeckReleaseUrl);
         }
 
         ImGui.SetNextItemWidth(120);
