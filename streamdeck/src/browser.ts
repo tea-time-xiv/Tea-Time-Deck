@@ -1,7 +1,7 @@
 import streamDeck, { type KeyAction } from "@elgato/streamdeck";
 
 import { allowedFrom, layoutPage, sameKinds, wrapTitle, type BrowserKindSettings } from "./browser-util.js";
-import { renderBrowserKind, renderMessage, toDataUri } from "./status-render.js";
+import { renderBrowserKind, renderEntryFace, renderMessage, toDataUri } from "./status-render.js";
 import { xiv, type CatalogEntry, type CatalogKind } from "./xiv-client.js";
 
 /**
@@ -246,13 +246,16 @@ class DeviceBrowser {
 			return;
 		}
 
-		await slot.setTitle(wrapTitle(entry.name));
-
-		// Glamourer designs have no game artwork; the name alone is the key face.
+		// Glamourer designs have no game artwork, so the plugin draws the face itself
+		// rather than leaving a black key with a title strip on it: the name is the whole
+		// of what the key says, and it is worth the room.
 		if (entry.iconId === 0) {
-			await slot.setImage();
+			await slot.setTitle("");
+			await slot.setImage(toDataUri(renderEntryFace(entry)));
 			return;
 		}
+
+		await slot.setTitle(wrapTitle(entry.name));
 
 		try {
 			await slot.setImage(await xiv.getIcon(entry.iconId));

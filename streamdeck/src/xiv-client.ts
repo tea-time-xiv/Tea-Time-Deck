@@ -20,6 +20,11 @@ export type CatalogEntry = {
 	 * Glamourer's Reset. Absent from older servers, where nothing was pinned.
 	 */
 	pinned?: boolean;
+	/**
+	 * Tint to draw the entry in, as 0xRRGGBB, where the kind has one -- Glamourer reports
+	 * the colour its own list uses. Absent or 0 means the client chooses.
+	 */
+	color?: number;
 };
 
 export type CatalogKind = {

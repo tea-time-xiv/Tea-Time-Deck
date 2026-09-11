@@ -298,6 +298,12 @@
 				settings.name = entry.name;
 				settings.iconId = entry.iconId;
 
+				// Only used to draw kinds with no artwork of their own, where the plugin
+				// paints the face itself. Saved with the rest so the key can paint the
+				// moment it appears, without the game having to be running.
+				settings.category = entry.category || null;
+				settings.color = entry.color || 0;
+
 				if (entry.key) {
 					settings.key = entry.key;
 				} else {
@@ -320,6 +326,8 @@
 				delete settings.name;
 				delete settings.iconId;
 				delete settings.key;
+				delete settings.category;
+				delete settings.color;
 				saveSettings();
 				requestEntries();
 			});

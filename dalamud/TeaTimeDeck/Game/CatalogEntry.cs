@@ -17,6 +17,12 @@ namespace TeaTimeDeck.Game;
 /// Identifier for kinds the game does not number, currently Glamourer's design GUIDs.
 /// Null for everything that has an Excel row id, which is what <see cref="Id"/> is for.
 /// </param>
+/// <param name="Color">
+/// Tint a client may draw the entry in, as 0xRRGGBB, or 0 for none. For kinds with no
+/// game artwork it is most of what tells one key from another at a glance; Glamourer
+/// fills it from the colour its own UI draws each design in, so the deck matches the
+/// list the player already knows. A hint, like <see cref="Pinned"/>.
+/// </param>
 /// <param name="Pinned">
 /// Asks a browser to keep this entry on a key of its own rather than letting it page away
 /// with the rest -- currently only Glamourer's Reset, which is worth reaching from page
@@ -35,4 +41,7 @@ public sealed record CatalogEntry(
     // Left off the wire when false, which is every entry but one: a hundred emotes each
     // carrying "pinned": false would be a hundred lines saying nothing.
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    bool Pinned = false);
+    bool Pinned = false,
+    // Same reason: every kind that has artwork has no colour to report.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    uint Color = 0);

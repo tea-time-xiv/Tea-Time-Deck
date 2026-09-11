@@ -399,6 +399,182 @@ function pager(index: number, count: number, y: number, style: PagerStyle): stri
 	}).join("");
 }
 
+/**
+ * Faces for entries the game has no artwork for -- Glamourer designs, today the only kind.
+ *
+ * A design is a name and nothing else, so the name gets the whole key rather than the
+ * SDK's title strip over a black square, and the colour Glamourer's own list draws the
+ * design in goes on as a band. Designs never given a colour borrow one from their folder,
+ * so a folder still reads as a group; the band is always there, because a key that
+ * sometimes has one and sometimes does not is harder to scan than one that always does.
+ */
+
+/** Structural, so both a catalog entry and a key's saved settings fit without converting. */
+export type EntryFace = {
+	kind?: string;
+	name?: string;
+	category?: string | null;
+	key?: string | null;
+	color?: number;
+};
+
+/** Glamourer's revert, as `docs/protocol.md` names it. Not a GUID, so nothing collides. */
+const RESET_KEY = "reset";
+
+/** Which drawn face an entry without artwork gets. */
+export function renderEntryFace(entry: EntryFace): string {
+	if (entry.kind === "glamourer" && entry.key === RESET_KEY) {
+		return renderReset();
+	}
+
+	return renderDesign(entry.name ?? "", entry.category ?? null, entry.color);
+}
+
+/**
+ * Hues for designs that report no colour of their own, which is most of them -- Glamourer
+ * only stores one when the user picks one.
+ *
+ * Taken from the folder where there is one, so a folder reads as a group, and from the
+ * design's own name where there is not, so a flat list is still told apart key by key.
+ * Neither claims anything about what the design puts on; it is a handle to grab, the way
+ * a coloured tab is.
+ */
+const BORROWED_COLOURS = ["#7fb2e5", "#7fdc86", "#dd9bea", "#efa76a", "#6fd6cf", "#c0a9f0", "#e8d27a"];
+
+function borrowedColour(from: string): string {
+	// Any stable spread will do; this only has to give the same word the same hue every
+	// time, not resist anything.
+	let hash = 0;
+	for (let i = 0; i < from.length; i++) {
+		hash = (hash * 31 + from.charCodeAt(i)) | 0;
+	}
+
+	return BORROWED_COLOURS[Math.abs(hash) % BORROWED_COLOURS.length]!;
+}
+
+function rgbHex(colour: number): string {
+	return `#${(colour & 0xffffff).toString(16).padStart(6, "0")}`;
+}
+
+/**
+ * Sizes tried for a design name, largest first. Segoe UI Bold runs about 0.56em per
+ * character averaged over mixed case, which is close enough to pick a size that fits --
+ * the fallback is a name a little smaller than it had to be, not one off the key.
+ */
+const NAME_SIZES = [27, 23, 20, 17];
+
+const NAME_WIDTH = SIZE - 22;
+
+const CHAR_RATIO = 0.56;
+
+/**
+ * Greedy wrap. Reports whether a word had to be cut mid-word to fit, which is a reason to
+ * try a smaller size rather than an acceptable answer: "Antiquat / ed Shire" is worse than
+ * the same name a size down.
+ */
+function wrapToWidth(text: string, max: number): { lines: string[]; cut: boolean } {
+	const lines: string[] = [];
+	let current = "";
+	let cut = false;
+
+	for (const word of text.split(/\s+/).filter((part) => part.length > 0)) {
+		if (current.length === 0) {
+			current = word;
+		} else if (current.length + 1 + word.length <= max) {
+			current = `${current} ${word}`;
+		} else {
+			lines.push(current);
+			current = word;
+		}
+
+		while (current.length > max) {
+			lines.push(current.slice(0, max));
+			current = current.slice(max);
+			cut = true;
+		}
+	}
+
+	if (current.length > 0) {
+		lines.push(current);
+	}
+
+	return { lines: lines.length > 0 ? lines : [""], cut };
+}
+
+/** Three lines, which is what fits above the colour band without crowding it. */
+const NAME_LINES = 3;
+
+/**
+ * The largest size the name fits in whole. Names too long for any of them -- one
+ * unbroken word longer than a line, mostly -- settle for the smallest, cut and then
+ * ellipsised, because there is no size at which they were going to fit.
+ */
+function fitName(name: string): { lines: string[]; size: number } {
+	let last = { lines: [""], size: NAME_SIZES[NAME_SIZES.length - 1]! };
+
+	for (const size of NAME_SIZES) {
+		const { lines, cut } = wrapToWidth(name, Math.floor(NAME_WIDTH / (size * CHAR_RATIO)));
+		last = { lines, size };
+
+		if (lines.length <= NAME_LINES && !cut) {
+			return last;
+		}
+	}
+
+	if (last.lines.length <= NAME_LINES) {
+		return last;
+	}
+
+	const kept = last.lines.slice(0, NAME_LINES);
+	kept[NAME_LINES - 1] = `${kept[NAME_LINES - 1]!.slice(0, -1)}…`;
+
+	return { lines: kept, size: last.size };
+}
+
+export function renderDesign(name: string, folder: string | null, colour: number | undefined): string {
+	// The last segment is the one that tells designs apart; the folders above it are
+	// shared by everything on the page and would spend the row saying nothing.
+	const leaf = folder === null ? null : (folder.split("/").pop() ?? null);
+	const heading = leaf === null || leaf.length === 0 ? "" : label(truncate(leaf, 11));
+
+	// Borrowed from the leaf rather than the whole path, so the colour and the word above
+	// it agree: two folders drawn with the same heading would otherwise wear two colours.
+	const swatch =
+		colour !== undefined && colour !== 0 ? rgbHex(colour) : borrowedColour(leaf ?? name);
+
+	// The folder row takes the top of the key when there is one, so the name sits lower.
+	const { lines, size } = fitName(name);
+	const step = size * 1.12;
+	const middle = heading === "" ? 66 : 78;
+	const first = middle - (step * (lines.length - 1)) / 2 + size * 0.35;
+
+	const text = lines
+		.map(
+			(line, index) =>
+				`<text x="${SIZE / 2}" y="${(first + index * step).toFixed(1)}" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="${size}" font-weight="700" fill="${INK.text}">${escapeText(line)}</text>`,
+		)
+		.join("");
+
+	const band =
+		`<rect x="14" y="120" width="${SIZE - 28}" height="11" rx="4" fill="${swatch}"/>` +
+		`<rect x="14" y="120" width="${SIZE - 28}" height="11" rx="4" fill="none" stroke="rgba(0,0,0,0.45)" stroke-width="1"/>`;
+
+	return frame(heading + text + band);
+}
+
+/**
+ * Glamourer's revert. Drawn rather than named because it is the one key here that takes a
+ * look off instead of putting one on, and a name in the same style as the designs around
+ * it would read as one more design.
+ */
+export function renderReset(): string {
+	const arrow =
+		`<path d="M 72 42 A 26 26 0 1 1 46 68" fill="none" stroke="${INK.label}" stroke-width="9" stroke-linecap="round"/>` +
+		`<path d="M 46 51 L 55 71 L 37 71 Z" fill="${INK.label}"/>`;
+
+	return frame(arrow + centeredValue("RESET", 126, 22, INK.label));
+}
+
 function formatDuration(seconds: number): string {
 	const whole = Math.ceil(seconds);
 

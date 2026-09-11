@@ -67,7 +67,8 @@ internal sealed class GlamourerCatalog : ICatalogProvider
                 Id: 0,
                 Name: design.Name,
                 // Designs have no game artwork, and inventing one would be a lie about what
-                // the design contains. The deck falls back to the name on the key.
+                // the design contains. The deck falls back to the name on the key, drawn in
+                // the colour below.
                 IconId: 0,
                 Category: FolderOf(design.FullPath),
                 // Already ordered by path, so this keeps the deck's paging matching the
@@ -77,7 +78,12 @@ internal sealed class GlamourerCatalog : ICatalogProvider
                 // setting so it says what a press will actually do. Execution goes over IPC:
                 // it reports success, and it cannot be seen by anyone else.
                 Command: $"/glamour {glamourer.ApplyCommand} \"{design.Name}\" | <me>",
-                Key: design.Id.ToString("D")));
+                Key: design.Id.ToString("D"),
+                // The colour Glamourer's own list draws this design in. Reported rather
+                // than invented, so a deck of name-only keys is told apart the same way the
+                // player already tells them apart in game -- and 0, for a design never
+                // coloured, leaves the client to choose rather than claiming a colour.
+                Color: design.Color));
         }
 
         return entries;
