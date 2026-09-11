@@ -10,6 +10,7 @@ import streamDeck, {
 // The SDK uses these types in its own public signatures but re-exports them from here.
 import type { JsonValue } from "@elgato/utils";
 
+import { renderEntryFace, toDataUri } from "../status-render.js";
 import { xiv } from "../xiv-client.js";
 
 /** What the property inspector stores against a key. */
@@ -23,6 +24,14 @@ export type EntrySettings = {
 	 * a key still points at the design it was set to after others are added or deleted.
 	 */
 	key?: string;
+	/**
+	 * Only used to draw kinds with no game artwork, and saved alongside the name for the
+	 * same reason the name is: the key has to paint on appearance, before the game is
+	 * necessarily running. A recolour in Glamourer therefore shows here when the entry is
+	 * picked again, which is a staler face than the browser's and a cheap one to live with.
+	 */
+	category?: string | null;
+	color?: number;
 };
 
 /** Messages the property inspector sends us. */
@@ -95,14 +104,22 @@ export class EntryAction extends SingletonAction<EntrySettings> {
 	}
 
 	async #render(target: WillAppearEvent<EntrySettings>["action"], settings: EntrySettings): Promise<void> {
-		await target.setTitle(settings.name ?? "Set\nentry");
-
-		// 0 is an entry with no game artwork of its own, the same as having none.
-		if (settings.iconId === undefined || settings.iconId === 0) {
-			// No argument resets the key to the image declared in the manifest.
+		if (settings.name === undefined) {
+			// Nothing chosen yet: say so over the artwork the manifest declares.
+			await target.setTitle("Set\nentry");
 			await target.setImage();
 			return;
 		}
+
+		// 0 is an entry with no game artwork of its own -- a Glamourer design. Drawn here
+		// the same way the browser draws it, so one design looks the same on either key.
+		if (settings.iconId === undefined || settings.iconId === 0) {
+			await target.setTitle("");
+			await target.setImage(toDataUri(renderEntryFace(settings)));
+			return;
+		}
+
+		await target.setTitle(settings.name);
 
 		try {
 			await target.setImage(await xiv.getIcon(settings.iconId));

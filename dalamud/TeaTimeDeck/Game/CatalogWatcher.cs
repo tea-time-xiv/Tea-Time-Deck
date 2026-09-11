@@ -184,8 +184,10 @@ internal sealed class CatalogWatcher : IDisposable
     }
 
     /// <summary>
-    /// What the deck shows of a design: that it exists, its name, and the folder it is
-    /// filed under. What the design actually puts on the character is Glamourer's business.
+    /// What the deck shows of a design: that it exists, its name, the folder it is filed
+    /// under and the colour it is drawn in -- a recolour in Glamourer changes a key face
+    /// here, so it has to count as a change. What the design actually puts on the character
+    /// is Glamourer's business.
     /// </summary>
     private int HashDesigns()
     {
@@ -196,6 +198,7 @@ internal sealed class CatalogWatcher : IDisposable
             hash.Add(design.Id);
             hash.Add(design.Name);
             hash.Add(design.FullPath);
+            hash.Add(design.Color);
         }
 
         return hash.ToHashCode();

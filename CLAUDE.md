@@ -111,6 +111,18 @@ gear half on is not an undo. `Pinned` is a layout hint the deck honours by givin
 entry a key on every page (`layoutPage` in `browser-util.ts`), dropped when the browser
 has too few slots to page without it.
 
+Designs have no game artwork, so `iconId` is 0 and the deck draws the face itself
+(`renderDesign`/`renderReset` in `status-render.ts`, chosen by `renderEntryFace`): the
+name gets the whole key rather than the SDK's title strip, over a band of the design's
+own colour. That colour is `CatalogEntry.Color`, reported from Glamourer's `DisplayColor`
+and converted to 0xRRGGBB in `GlamourerIpc` — reported, never invented, which is why a
+design that was never coloured sends 0 and the deck borrows a hue from its folder, or from
+its name where there is no folder. Uncoloured is `0xFFFFFFFF` on the wire from Glamourer,
+not 0: that is the shade its list draws an uncoloured name in, and taking it literally put
+the same white band on every key.
+It is in `CatalogWatcher`'s design hash for the same reason the name is: a recolour
+changes a key face.
+
 A kind whose ids the game does not mint sets `Addressing => CatalogAddressing.Key`
 and fills `CatalogEntry.Key`; `execute` then wants `key` rather than `id`, which
 the router asks the registry about rather than deciding by name. `glamourer` is

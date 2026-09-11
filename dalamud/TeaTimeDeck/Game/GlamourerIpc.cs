@@ -21,7 +21,9 @@ internal sealed class GlamourerIpc
 {
     /// <summary>
     /// One design as Glamourer's extended list describes it: its display name, its full
-    /// path within the design folders, and the colour its own UI draws it in.
+    /// path within the design folders, and the colour its own UI draws it in, as 0xRRGGBB
+    /// rather than in the packing Glamourer hands over. 0 is no colour, which is what an
+    /// untouched design has.
     /// </summary>
     public readonly record struct Design(Guid Id, string Name, string FullPath, uint Color);
 
@@ -120,7 +122,7 @@ internal sealed class GlamourerIpc
 
             return designList.InvokeFunc()
                 .Select(pair => new Design(pair.Key, pair.Value.DisplayName, pair.Value.FullPath,
-                    pair.Value.DisplayColor))
+                    ToRgb(pair.Value.DisplayColor)))
                 // Deterministic, which the catalog wants for its ordering and the watcher
                 // wants for its hash -- dictionary order would reshuffle on every edit.
                 .OrderBy(design => design.FullPath, StringComparer.OrdinalIgnoreCase)
@@ -160,6 +162,31 @@ internal sealed class GlamourerIpc
             throw new InvalidOperationException("Glamourer is not installed or not loaded");
 
         return revertState.InvokeFunc(LocalPlayerIndex, NoLockKey, EquipmentFlag | CustomizationFlag);
+    }
+
+    /// <summary>
+    /// Glamourer's design colour, which is an ImGui packing (0xAABBGGRR), as the 0xRRGGBB
+    /// the catalog reports. The alpha goes: a client draws the colour as its own design
+    /// asks, and a half-transparent swatch on a key is a worse answer than a solid one.
+    ///
+    /// Opaque white is what Glamourer hands over for a design nobody has coloured -- it is
+    /// the colour its list draws an uncoloured name in, not a choice anyone made -- so it
+    /// reports as no colour. Verified against a design list where every entry came back
+    /// 0xFFFFFFFF; taking it at face value gave a deck of identical white bands, which
+    /// says less than no band at all.
+    ///
+    /// A design deliberately coloured white, or black, therefore reports the same 0 as one
+    /// never coloured. Both get the client's own choice of colour, which for white is the
+    /// better outcome anyway: the band sits under near-white text.
+    /// </summary>
+    private static uint ToRgb(uint packed)
+    {
+        if ((packed & 0xFF000000u) == 0)
+            return 0;
+
+        var rgb = ((packed & 0xFFu) << 16) | (packed & 0xFF00u) | ((packed >> 16) & 0xFFu);
+
+        return rgb == 0xFFFFFFu ? 0 : rgb;
     }
 
     /// <summary>Glamourer's own words for a result code, for the ones worth reporting.</summary>

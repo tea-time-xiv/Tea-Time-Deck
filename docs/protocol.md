@@ -165,7 +165,7 @@ Returns everything the player owns of that kind, in the game's own display order
     { "kind": "glamourer", "id": 0, "name": "Elezen F", "iconId": 0,
       "category": "Casual", "sortOrder": 3,
       "command": "/glamour apply \"Elezen F\" | <me>",
-      "key": "10765f9e-9377-40d7-b3aa-c86d8dd41c33" }
+      "key": "10765f9e-9377-40d7-b3aa-c86d8dd41c33", "color": 8368869 }
   ]
 }
 ```
@@ -186,6 +186,18 @@ layout, not about behaviour: a client that ignores it shows the entry first,
 which is where it already sorts. Only leading entries are ever pinned, and a
 browser too small to spare the slot should ignore the request rather than lose
 its ability to page.
+
+`color` is present only when non-zero, and is a tint to draw the entry in as
+`0xRRGGBB` — for designs, the colour Glamourer's own list draws them in. A hint
+about appearance, like `pinned`, and only kinds with no game artwork report one:
+an entry with an `iconId` has a picture already. Absent or zero means the client
+chooses; the Stream Deck plugin borrows one from the folder, or from the name
+where there is no folder, so keys are still told apart.
+
+A design nobody has coloured reports no colour rather than the opaque white
+Glamourer answers with, which is the shade its list draws an uncoloured name in
+rather than a choice anyone made. White and black designs therefore report zero
+too; both would be drawn against near-white text on a near-black key.
 
 `glamourer` is the only kind with one so far — `key` `reset`, which is not a
 GUID and never collides with one. It is Glamourer's own revert rather than a
