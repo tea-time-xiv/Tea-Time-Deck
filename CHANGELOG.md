@@ -7,7 +7,7 @@ short `-` bullets: no tables, no links, no bold.
 
 Versions before 0.3.0.0 predate this file; see the GitHub releases for those.
 
-## 0.5.0.0
+## 0.6.0.0
 
 - Glamourer designs get a key face of their own: the design name over a band of the
   colour Glamourer gives it, instead of a black key.
