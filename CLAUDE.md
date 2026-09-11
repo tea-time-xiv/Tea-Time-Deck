@@ -302,13 +302,23 @@ which is the condition `StatusService` and `CatalogWatcher` skip work on.
 
 ## Releasing
 
-`<Version>` in `TeaTimeDeck.csproj` is the single source of truth. Pushes to
-`main` only build; a release happens when a `v*` tag is pushed, and CI fails
-loudly if the tag disagrees with the csproj version. The tagged run stamps that
-version into the Stream Deck `manifest.json` at pack time (which is why the
-committed copy is already in the CLI's formatting), attaches `TeaTimeDeck.zip`
-plus the `.streamDeckPlugin`, and rewrites the entry in the separate
-`tea-time-xiv/pluginmaster` repo from `dalamud/TeaTimeDeck/TeaTimeDeck.json` —
-so listing text is edited in that manifest, not in the workflow.
+`<Version>` in `TeaTimeDeck.csproj` is the single source of truth, and the only
+thing a release edits. A push to `main` carrying a version with no `v<version>`
+tag yet **is** the release: CI builds it, then mints the tag and publishes. A
+push whose version is already tagged only builds. Tagging by hand was the older
+shape and is gone — the tag was a second source of truth that had to be matched
+to the csproj, and the mismatch only showed up as a failed build after the tag
+was already public.
+
+The releasing run stamps that version into the Stream Deck `manifest.json` at
+pack time (which is why the committed copy is already in the CLI's formatting)
+and attaches `TeaTimeDeck.zip` plus the `.streamDeckPlugin`. The separate
+`tea-time-xiv/pluginmaster` repo builds its own entry from this repo's latest
+release and the manifest inside that zip — neither repo holds a credential for
+the other, so it arrives on that repo's schedule within 15 minutes, or at once
+if its *Publish pluginmaster* workflow is run by hand. A release whose assets
+are missing cannot be read, and that repo keeps the previous entry rather than
+publishing a broken one; listing text is edited in
+`dalamud/TeaTimeDeck/TeaTimeDeck.json`, not in the workflow.
 
 License is AGPL-3.0-or-later; keep new files consistent with that.
