@@ -157,7 +157,9 @@ the `.streamDeckPlugin` installer instead.
 1. Bump `<Version>` in the csproj and add the matching `## <version>` section to
    `CHANGELOG.md`. CI fails the build without one — that section becomes both the GitHub
    release notes and the in-game changelog.
-2. Merge to `main`, then push a `v<version>` tag. CI builds, checks the tag against the csproj version and publishes the GitHub release.
+2. Merge to `main`. That is the release: CI sees a csproj version with no `v<version>`
+   tag, builds it, then mints the tag and publishes the GitHub release itself. Nothing
+   to tag by hand, and a version that already has a tag just builds.
 3. The Tea Time plugin repo picks the release up within 15 minutes. To publish at once, run
    its *Publish pluginmaster* workflow: `gh workflow run publish.yml -R tea-time-xiv/pluginmaster`,
    or the **Run workflow** button on that repo's Actions tab. This repo holds no credential
