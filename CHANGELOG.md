@@ -7,6 +7,13 @@ short `-` bullets: no tables, no links, no bold.
 
 Versions before 0.3.0.0 predate this file; see the GitHub releases for those.
 
+## 0.5.0.0
+
+- Glamourer designs get a key face of their own: the design name over a band of the
+  colour Glamourer gives it, instead of a black key.
+- A design with no colour set borrows one from its folder, or from its name where it
+  has no folder, so keys are still told apart.
+
 ## 0.4.0.0
 
 - Glamourer browser gained a Reset key.
