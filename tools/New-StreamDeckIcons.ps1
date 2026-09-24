@@ -34,7 +34,7 @@ function New-Glyph {
     #>
     param(
         [single]$Size,
-        [ValidateSet('crystal', 'cell', 'left', 'right', 'swap', 'heart', 'shield', 'flag', 'hourglass', 'ring')]
+        [ValidateSet('crystal', 'cell', 'left', 'right', 'swap', 'heart', 'shield', 'flag', 'hourglass', 'ring', 'speaker')]
         [string]$Glyph
     )
 
@@ -142,6 +142,27 @@ function New-Glyph {
                 ))
         }
 
+        'speaker' {
+            # Volume. A speaker cone, and one arc of sound in front of it: a thick ring
+            # clipped to its right-hand side by an annulus sector.
+            $path.AddRectangle([System.Drawing.RectangleF]::new($cx - $Size * 0.32, $cy - $Size * 0.10, $Size * 0.14, $Size * 0.20))
+            $path.AddPolygon(@(
+                    [System.Drawing.PointF]::new($cx - $Size * 0.19, $cy - $Size * 0.10)
+                    [System.Drawing.PointF]::new($cx + $Size * 0.02, $cy - $Size * 0.28)
+                    [System.Drawing.PointF]::new($cx + $Size * 0.02, $cy + $Size * 0.28)
+                    [System.Drawing.PointF]::new($cx - $Size * 0.19, $cy + $Size * 0.10)
+                ))
+
+            $outer = $Size * 0.30
+            $inner = $Size * 0.21
+            $arc = [System.Drawing.Drawing2D.GraphicsPath]::new()
+            $arc.AddArc($cx - $outer, $cy - $outer, $outer * 2, $outer * 2, -45, 90)
+            $arc.AddArc($cx - $inner, $cy - $inner, $inner * 2, $inner * 2, 45, -90)
+            $arc.CloseFigure()
+            $path.AddPath($arc, $false)
+            $arc.Dispose()
+        }
+
         'swap' {
             # Two arrowheads on separate rows pointing opposite ways: cycling between
             # kinds. They must not overlap, or they read as a single lightning bolt.
@@ -237,6 +258,7 @@ $actions = [ordered]@{
     duty    = 'flag'
     venture = 'hourglass'
     recast  = 'ring'
+    volume  = 'speaker'
 }
 
 foreach ($name in $actions.Keys) {
@@ -253,5 +275,11 @@ foreach ($name in $actions.Keys) {
     Save-Icon -Path (Join-Path $dir 'key.png') -Size 72 -Glyph $glyph -Tile $tile
     Save-Icon -Path (Join-Path $dir 'key@2x.png') -Size 144 -Glyph $glyph -Tile $tile
 }
+
+# A dial's touch strip draws its own panel behind the icon, so the dial icon is the
+# white-on-transparent glyph at key size rather than a second tile.
+$volume = Join-Path $PluginRoot 'imgs\actions\volume'
+Save-Icon -Path (Join-Path $volume 'dial.png') -Size 72 -Glyph 'speaker' -Transparent
+Save-Icon -Path (Join-Path $volume 'dial@2x.png') -Size 144 -Glyph 'speaker' -Transparent
 
 Write-Host "done" -ForegroundColor Green

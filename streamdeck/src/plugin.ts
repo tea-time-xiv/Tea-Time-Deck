@@ -8,6 +8,7 @@ import {
 } from "./actions/browser-actions.js";
 import { EntryAction } from "./actions/entry-action.js";
 import { repaintAllStatus, startStatusClock, statusActions } from "./actions/status-actions.js";
+import { volumeAction } from "./actions/volume-action.js";
 import { repaintAllBrowsers } from "./browser.js";
 import { type ServerStatus, xiv } from "./xiv-client.js";
 
@@ -32,6 +33,7 @@ streamDeck.actions.registerAction(new BrowserSlotAction());
 streamDeck.actions.registerAction(new BrowserPrevAction());
 streamDeck.actions.registerAction(new BrowserNextAction());
 streamDeck.actions.registerAction(new BrowserKindAction());
+streamDeck.actions.registerAction(volumeAction);
 
 for (const status of statusActions) {
 	streamDeck.actions.registerAction(status);
@@ -51,6 +53,11 @@ xiv.on("invalidated", () => void repaintAllBrowsers());
 // between pushes because their countdowns are derived from an absolute time.
 xiv.on("status", () => void repaintAllStatus());
 startStatusClock();
+
+// Volume rides on the same snapshot, and also repaints on the answer to its own change so
+// a turned dial does not wait a quarter second for the push to catch up.
+xiv.on("status", () => void volumeAction.repaintAll());
+xiv.on("volume", () => void volumeAction.repaintAll());
 
 // The inspector runs in a browser and cannot read the game's config itself, so tell it
 // where the port came from.

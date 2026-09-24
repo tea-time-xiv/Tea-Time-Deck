@@ -63,7 +63,21 @@ export type StatusSnapshot = {
 	duty: { state: string; dutyName: string | null };
 	retainers: { total: number; active: number; ready: number; soonestCompleteAt?: number | null };
 	cooldowns: { id: number; remaining: number; total: number }[];
+	/** The game's volume sliders. Absent from older servers, which had none to offer. */
+	volume?: VolumeChannel[];
 };
+
+/** One of the game's volume sliders, as the Sound Settings tab has it. */
+export type VolumeChannel = {
+	channel: string;
+	/** 0-100. */
+	volume: number;
+	/** Absent for the channels the game offers no mute for. */
+	muted?: boolean | null;
+};
+
+/** What a `volume.set` asks for. `volume` and `delta` are exclusive. */
+export type VolumeChange = { volume?: number; delta?: number; muted?: boolean };
 
 export type CooldownSource = { id: number; name: string; iconId: number };
 
@@ -216,6 +230,26 @@ export class XivClient extends EventEmitter {
 	public async getCooldownSources(): Promise<CooldownSource[]> {
 		const payload = (await this.#request("status.cooldownSources")) as { sources: CooldownSource[] };
 		return payload.sources;
+	}
+
+	/**
+	 * The answer is folded into the held snapshot straight away rather than left for the
+	 * next push. A second press inside that quarter second -- a quick double tap on mute --
+	 * would otherwise read the old state and undo the first instead of repeating it.
+	 */
+	public async setVolume(channel: string, change: VolumeChange): Promise<VolumeChannel> {
+		const result = (await this.#request("volume.set", { channel, ...change })) as VolumeChannel;
+
+		const status = this.#status;
+		if (status?.volume) {
+			this.#status = {
+				...status,
+				volume: status.volume.map((held) => (held.channel === result.channel ? result : held)),
+			};
+		}
+
+		this.emit("volume");
+		return result;
 	}
 
 	/**

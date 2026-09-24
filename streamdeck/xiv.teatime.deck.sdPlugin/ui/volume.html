@@ -1,0 +1,101 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<title>Game Volume</title>
+		<style>
+			body {
+				background: #2d2d2d;
+				color: #d8d8d8;
+				font: 9pt "Segoe UI", sans-serif;
+				margin: 0;
+				padding: 12px;
+			}
+			.row {
+				align-items: center;
+				display: flex;
+				gap: 8px;
+				margin-bottom: 8px;
+			}
+			label {
+				color: #969696;
+				flex: 0 0 84px;
+				text-align: right;
+			}
+			select {
+				background: #3d3d3d;
+				border: 1px solid #4d4d4d;
+				border-radius: 3px;
+				color: #d8d8d8;
+				flex: 1 1 auto;
+				padding: 4px 6px;
+			}
+			.hint {
+				color: #808080;
+				margin-bottom: 8px;
+				margin-left: 92px;
+			}
+		</style>
+	</head>
+
+	<body>
+		<div class="row">
+			<label for="channel">Channel</label>
+			<select id="channel">
+				<option value="master">Master</option>
+				<option value="bgm">BGM</option>
+				<option value="effects">Sound Effects</option>
+				<option value="voice">Voice</option>
+				<option value="system">System Sounds</option>
+				<option value="ambient">Ambient Sounds</option>
+				<option value="performance">Performance</option>
+				<option value="self">Self (effects)</option>
+				<option value="party">Party (effects)</option>
+				<option value="others">Other PCs (effects)</option>
+			</select>
+		</div>
+
+		<div class="row">
+			<label for="step">Step</label>
+			<select id="step">
+				<option value="1">1 per tick</option>
+				<option value="2">2 per tick</option>
+				<option value="5">5 per tick</option>
+				<option value="10">10 per tick</option>
+			</select>
+		</div>
+
+		<div class="hint">Press and turn for single steps. Press or tap to mute.</div>
+		<div class="hint">Self, Party and Other PCs have no mute in the game, so a press there does nothing.</div>
+
+		<script>
+			let websocket;
+			let uuid;
+			let settings = {};
+
+			const channelSelect = document.getElementById("channel");
+			const stepSelect = document.getElementById("step");
+
+			function connectElgatoStreamDeckSocket(port, inUUID, registerEvent, info, actionInfo) {
+				uuid = inUUID;
+				settings = JSON.parse(actionInfo).payload.settings || {};
+				channelSelect.value = settings.channel || "master";
+				stepSelect.value = String(settings.step || 5);
+
+				websocket = new WebSocket("ws://127.0.0.1:" + port);
+				websocket.onopen = function () {
+					websocket.send(JSON.stringify({ event: registerEvent, uuid: uuid }));
+				};
+			}
+
+			function save() {
+				settings.channel = channelSelect.value;
+				settings.step = Number(stepSelect.value);
+				websocket.send(JSON.stringify({ event: "setSettings", context: uuid, payload: settings }));
+			}
+
+			channelSelect.addEventListener("change", save);
+			stepSelect.addEventListener("change", save);
+		</script>
+	</body>
+</html>

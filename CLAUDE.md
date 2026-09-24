@@ -64,6 +64,7 @@ scripts in `tools/`, which are the test harness:
 .\tools\Get-Catalog.ps1  -Kind emote
 .\tools\Invoke-Entry.ps1 -Kind emote -Name Wave
 .\tools\Test-Glamourer.ps1 -Apply              # designs, refusals, the interval floor
+.\tools\Set-Volume.ps1 -Channel bgm -Delta -5  # moves the in-game slider; no args lists them
 ```
 
 `Test-Glamourer.ps1` is the closest thing here to a regression suite, and it is
@@ -185,6 +186,12 @@ authoritative log. On the deck side `status-actions.ts` repaints on push, plus a
 local 1 Hz clock for ventures and recast because those count down from an
 absolute time.
 
+The volume sliders ride on the same snapshot (sampled before the login check —
+they are system config and work at the title screen). The Stream Deck + dial
+(`volume-action.ts`) sends turns as a `delta`, never an absolute level, because
+several can be in flight at once; `xiv.setVolume` folds each answer back into the
+held snapshot so a quick double tap on mute reads the first tap's result.
+
 ### The browser (deck half)
 
 The headline feature and the reason for most of the odd shapes in
@@ -229,6 +236,9 @@ port:
 - Glamourer designs are applied over Glamourer's IPC at object index 0 — the local
   player — never by sending `/glamour apply`. The no-chat-command rule below is
   the reason, and the IPC also answers with a result code a text command cannot.
+- `volume.set` writes the game's sound sliders through `IGameConfig` (`GameVolume`)
+  — the system config the Sound Settings tab edits, never an audio hook. It does
+  not claim the gate: it is a setting, not an action, and a dial turns in bursts.
 - Max 8 sessions; `/health` deliberately reveals nothing about the character.
 
 ### Scope discipline
