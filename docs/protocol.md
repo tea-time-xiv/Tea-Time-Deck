@@ -54,6 +54,10 @@ Worth stating plainly, since there is no auth to hide behind:
   attack, and can equip a gear set. Both are one press at a time — see below —
   but neither is cosmetic, and this is the honest reading of leaving the port open.
 - One execution per 100 ms, enforced server-side.
+- `volume.set` moves the game's own volume sliders and mute switches — the ones
+  in System Configuration → Sound Settings — and nothing else. It is a setting
+  rather than an action, so the 100 ms floor does not apply to it: a dial sends
+  a burst of ticks when turned.
 
 Nothing here reads chat or moves the character, and nothing queues, repeats or
 schedules: one request performs one action, the way one key press does. What the
@@ -338,7 +342,9 @@ as a `status.update` event. Ask once on connect; after that, wait for the pushes
               "shieldPercent": 0, "preferred": "mp" },
   "duty": { "state": "inDuty", "dutyName": "the Thousand Maws of Toto-Rak" },
   "retainers": { "total": 3, "active": 3, "ready": 1, "soonestCompleteAt": 1785000000 },
-  "cooldowns": [ { "id": 4, "remaining": 42.3, "total": 60 } ]
+  "cooldowns": [ { "id": 4, "remaining": 42.3, "total": 60 } ],
+  "volume": [ { "channel": "master", "volume": 80, "muted": false },
+              { "channel": "party", "volume": 60 } ]
 }
 ```
 
@@ -357,7 +363,15 @@ as a `status.update` event. Ask once on connect; after that, wait for the pushes
   sync caps what you fight, not what you earn towards. `experienceToNext` is 0 at
   maximum level, where there is no next level to describe; do not divide by it.
 
-Everything except `loggedIn` may be null or empty when no character is loaded.
+- `volume` is the game's sound sliders, 0–100, in the order the Sound Settings
+  tab lists them: `master`, `bgm`, `effects`, `voice`, `system`, `ambient`,
+  `performance`, then the per-player effect channels `self`, `party`, `others`.
+  `muted` is absent on those last three, which the game gives no mute. It is
+  system config rather than the character's, so it is filled in at the title
+  screen too. Absent from servers older than the field.
+
+Everything except `loggedIn` and `volume` may be null or empty when no character
+is loaded.
 
 ### `status.cooldownSources`
 
@@ -368,6 +382,43 @@ No payload. General actions the player has unlocked, for a picker.
                { "id": 7, "name": "Teleport", "iconId": 111 },
                { "id": 8, "name": "Return", "iconId": 112 } ] }
 ```
+
+### `volume.set`
+
+```json
+{ "channel": "bgm", "delta": -5 }
+```
+
+```json
+{ "channel": "master", "muted": true }
+```
+
+Changes one of the game's volume channels, through the same system config the
+Sound Settings tab edits — so the game's own slider moves with it. Any of:
+
+- `volume` — an absolute level, clamped to what the game allows (0–100).
+- `delta` — a change relative to the level the game has *now*, also clamped.
+  Exists for dials: several turns can be in flight before the first answer
+  arrives, and deltas applied in order land on the right value where absolute
+  levels computed from a stale reading would fight each other.
+- `muted` — the channel's mute switch. The slider keeps its level.
+
+`volume` and `delta` are exclusive; `muted` combines with either. Answers with the
+channel as it now stands, the same shape as one entry of the status `volume`
+list, and the next `status.update` carries it as well.
+
+```json
+{ "channel": "bgm", "volume": 40, "muted": false }
+```
+
+Needs no character: the sliders work at the title screen.
+
+| Condition | Error |
+| --- | --- |
+| Channel does not exist | `unknown volume channel 'music'` |
+| Nothing to change | `payload needs 'volume', 'delta' or 'muted'` |
+| Both levels sent | `send 'volume' or 'delta', not both` |
+| Mute on `self`, `party`, `others` | `volume channel 'party' cannot be muted` |
 
 ## Events
 

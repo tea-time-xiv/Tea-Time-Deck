@@ -42,6 +42,7 @@ internal sealed class RequestRouter
             ["icon.getMany"] = HandleIconGetMany,
             ["status.get"] = HandleStatusGet,
             ["status.cooldownSources"] = HandleCooldownSources,
+            ["volume.set"] = HandleVolumeSet,
         };
     }
 
@@ -55,6 +56,24 @@ internal sealed class RequestRouter
     private static Task<object?> HandleCooldownSources(JsonElement? _) =>
         Plugin.Framework.RunOnFrameworkThread(
             () => (object?)new { sources = StatusService.DescribeCooldownSources() });
+
+    /// <summary>
+    /// Answers with the channel as it now stands, so a dial can show the result without
+    /// waiting for the status push that will carry it anyway.
+    /// </summary>
+    private static Task<object?> HandleVolumeSet(JsonElement? payload)
+    {
+        var channel = RequireString(payload, "channel");
+        var volume = OptionalInt32(payload, "volume");
+        var delta = OptionalInt32(payload, "delta");
+        var muted = OptionalBoolean(payload, "muted");
+
+        if (volume is null && delta is null && muted is null)
+            throw new ArgumentException("payload needs 'volume', 'delta' or 'muted'");
+
+        return Plugin.Framework.RunOnFrameworkThread(
+            () => (object?)GameVolume.Set(channel, volume, delta, muted));
+    }
 
     public async Task<Message> DispatchAsync(Envelope envelope)
     {
@@ -210,6 +229,36 @@ internal sealed class RequestRouter
             throw new ArgumentException($"payload needs an unsigned integer '{name}'");
 
         return number;
+    }
+
+    private static int? OptionalInt32(JsonElement? payload, string name)
+    {
+        if (payload is not { ValueKind: JsonValueKind.Object } obj
+            || !obj.TryGetProperty(name, out var value) || value.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        if (!value.TryGetInt32(out var number))
+            throw new ArgumentException($"payload '{name}' must be an integer");
+
+        return number;
+    }
+
+    private static bool? OptionalBoolean(JsonElement? payload, string name)
+    {
+        if (payload is not { ValueKind: JsonValueKind.Object } obj
+            || !obj.TryGetProperty(name, out var value) || value.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            _ => throw new ArgumentException($"payload '{name}' must be a boolean"),
+        };
     }
 
     private static string RequireString(JsonElement? payload, string name)
