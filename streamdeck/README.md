@@ -154,6 +154,26 @@ time and need no traffic to stay accurate.
 When the game is closed the keys say `offline` rather than showing stale
 numbers.
 
+## Volume dials
+
+**Game Volume** is a Stream Deck + dial action. Pick a channel in the inspector —
+Master, BGM, Sound Effects, Voice, System, Ambient, Performance, or the Self /
+Party / Other PCs effect levels — and a step size.
+
+| Gesture | Does |
+| --- | --- |
+| Turn | Moves the channel by the step (default 5) |
+| Press and turn | Moves it by 1, for the values a coarse step skips |
+| Press, or tap the strip | Toggles the channel's mute |
+
+It moves the game's own slider in System Configuration, so the two always agree:
+drag it in game and the dial follows. A muted channel keeps its level on the bar,
+dimmed, because that is where it comes back. Self, Party and Other PCs have no mute
+in the game, so a press there only shakes the dial.
+
+The sliders are system settings rather than the character's, so the dials work
+from the title screen too.
+
 ## Layout
 
 | Path | What |

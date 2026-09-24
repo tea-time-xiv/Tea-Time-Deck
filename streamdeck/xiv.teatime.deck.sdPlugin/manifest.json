@@ -186,6 +186,31 @@
           "Image": "imgs/actions/recast/key"
         }
       ]
+    },
+    {
+      "UUID": "xiv.teatime.deck.volume",
+      "Name": "Game Volume",
+      "Icon": "imgs/actions/volume/icon",
+      "Tooltip": "Turn to change one of the game's volume channels; press or tap to mute it.",
+      "PropertyInspectorPath": "ui/volume.html",
+      "Controllers": [
+        "Encoder"
+      ],
+      "Encoder": {
+        "layout": "$B1",
+        "Icon": "imgs/actions/volume/dial",
+        "TriggerDescription": {
+          "Rotate": "Volume",
+          "Push": "Mute",
+          "Touch": "Mute"
+        }
+      },
+      "UserTitleEnabled": false,
+      "States": [
+        {
+          "Image": "imgs/actions/volume/key"
+        }
+      ]
     }
   ]
 }

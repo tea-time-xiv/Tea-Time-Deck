@@ -325,6 +325,46 @@ describe("status", () => {
 	});
 });
 
+describe("volume.set", () => {
+	it("folds the answer into the held snapshot, so a second tap reads the first one's result", async () => {
+		const socket = await connect(client);
+		deliver(socket, {
+			type: "status.update",
+			payload: {
+				loggedIn: true,
+				volume: [
+					{ channel: "master", volume: 80, muted: false },
+					{ channel: "bgm", volume: 30, muted: false },
+				],
+			},
+		});
+		await flush();
+
+		const heard = vi.fn();
+		client.on("volume", heard);
+
+		const pending = client.setVolume("master", { muted: true });
+		expect(frameOf(socket, "volume.set").payload).toEqual({ channel: "master", muted: true });
+
+		replyTo(socket, "volume.set", { channel: "master", volume: 80, muted: true });
+		await expect(pending).resolves.toEqual({ channel: "master", volume: 80, muted: true });
+
+		expect(client.status?.volume).toEqual([
+			{ channel: "master", volume: 80, muted: true },
+			{ channel: "bgm", volume: 30, muted: false },
+		]);
+		expect(heard).toHaveBeenCalledOnce();
+	});
+
+	it("sends a turn as a delta, leaving the server to add it to what the game has", async () => {
+		const socket = await connect(client);
+
+		client.setVolume("bgm", { delta: -5 }).catch(() => {});
+
+		expect(frameOf(socket, "volume.set").payload).toEqual({ channel: "bgm", delta: -5 });
+	});
+});
+
 describe("reconnection", () => {
 	it("fails everything in flight when the connection drops", async () => {
 		const socket = await connect(client);
