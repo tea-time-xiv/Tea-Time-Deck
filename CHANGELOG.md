@@ -7,6 +7,11 @@ short `-` bullets: no tables, no links, no bold.
 
 Versions before 0.3.0.0 predate this file; see the GitHub releases for those.
 
+## 0.7.0.0
+
+- Volume dials for Stream Deck +: turn to change any of the game's sound channels, press
+  or tap to mute. They move the game's own sliders, so the two always agree.
+
 ## 0.6.0.0
 
 - Glamourer designs get a key face of their own: the design name over a band of the
