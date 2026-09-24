@@ -36,6 +36,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static ITextureProvider TextureProvider { get; private set; } = null!;
     [PluginService] internal static ITextureReadbackProvider TextureReadback { get; private set; } = null!;
     [PluginService] internal static IChatGui ChatGui { get; private set; } = null!;
+    [PluginService] internal static IGameConfig GameConfig { get; private set; } = null!;
 
     internal readonly WindowSystem WindowSystem = new("TeaTimeDeck");
     internal Configuration Configuration { get; }

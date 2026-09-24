@@ -39,13 +39,16 @@ internal sealed class StatusService : IDisposable
     /// <summary>Most recent snapshot, for clients that ask rather than wait for a push.</summary>
     public StatusSnapshot Current { get; private set; } = Empty;
 
-    private static StatusSnapshot Empty => new(
+    private static StatusSnapshot Empty => LoggedOut([]);
+
+    private static StatusSnapshot LoggedOut(IReadOnlyList<VolumeStatus> volume) => new(
         LoggedIn: false,
         Job: null,
         Vitals: null,
         Duty: new DutyStatus("idle", null),
         Retainers: new RetainerStatus(0, 0, 0, null),
-        Cooldowns: []);
+        Cooldowns: [],
+        Volume: volume);
 
     private void OnUpdate(IFramework framework)
     {
@@ -84,9 +87,12 @@ internal sealed class StatusService : IDisposable
 
     private StatusSnapshot Sample()
     {
+        // Before the login check: volume is system config, not the character's.
+        var volume = GameVolume.Sample();
+
         var player = Plugin.ObjectTable.LocalPlayer;
         if (player is null || !Plugin.ClientState.IsLoggedIn)
-            return Empty;
+            return LoggedOut(volume);
 
         return new StatusSnapshot(
             LoggedIn: true,
@@ -94,7 +100,8 @@ internal sealed class StatusService : IDisposable
             Vitals: SampleVitals(player),
             Duty: SampleDuty(),
             Retainers: SampleRetainers(),
-            Cooldowns: SampleCooldowns());
+            Cooldowns: SampleCooldowns(),
+            Volume: volume);
     }
 
     private static JobStatus? SampleJob()
